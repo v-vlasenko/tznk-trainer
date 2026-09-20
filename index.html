@@ -241,12 +241,14 @@ const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0
 const keyOf = (v, n) => `${v}:${n}`;
 
 // ---------- storage ----------
-const emptyStore = () => ({ attempts: [], errors: {}, drill: {}, sessions: [], inProgress: null });
+// Timestamps (inProgressAt, errorsClearedAt, resetAt, savedAt) let two devices agree on deletions when their copies are merged.
+const emptyStore = () => ({ attempts: [], errors: {}, drill: {}, sessions: [], inProgress: null, inProgressAt: null, errorsClearedAt: null, resetAt: null, savedAt: null });
 let store = emptyStore();
 function loadStore() {
   try { const raw = localStorage.getItem(STORE_KEY); if (raw) store = Object.assign(emptyStore(), JSON.parse(raw)); } catch (e) { store = emptyStore(); }
 }
 function saveStore() {
+  store.savedAt = new Date().toISOString();
   try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* private mode */ }
   if (window.TZNK_SYNC) window.TZNK_SYNC.schedulePush();
 }
@@ -258,11 +260,12 @@ window.TZNK_APP = {
   isHome: () => !document.querySelector('.qbar'),
   el: (...a) => el(...a),
 };
+function setInProgress(state) { store.inProgress = state; store.inProgressAt = new Date().toISOString(); }
 function recordAnswer(item, variantId, correct) {
   const k = keyOf(variantId, item.n);
   const d = store.drill[k] || (store.drill[k] = { ok: 0, bad: 0 });
   if (correct) {
-    d.ok++;
+    d.ok++; d.lastOk = new Date().toISOString();
     if (store.errors[k]) delete store.errors[k];
   } else {
     d.bad++;
@@ -305,7 +308,7 @@ function home() {
         el('span', { class: 'muted small' }, ` · ${Object.keys(store.inProgress.answers).length} відповідей · залишилось ${fmtTime(store.inProgress.remaining)}`)),
       el('div', { class: 'row' },
         el('button', { class: 'btn primary small', onclick: () => startSim(store.inProgress.variantId, store.inProgress) }, 'Продовжити'),
-        el('button', { class: 'btn small danger', onclick: () => { store.inProgress = null; saveStore(); home(); } }, 'Скинути')))) : null;
+        el('button', { class: 'btn small danger', onclick: () => { setInProgress(null); saveStore(); home(); } }, 'Скинути')))) : null;
 
   const node = el('div', {},
     el('div', { class: 'stats' },
@@ -330,7 +333,7 @@ function home() {
         el('p', {}, errCount ? `${errCount} завдань, на які була неправильна відповідь. Правильна відповідь прибирає завдання зі списку.` : 'Список порожній. Помилки з симуляцій і тренажера з’являться тут.'),
         el('div', { class: 'row' },
           el('button', { class: 'btn primary', disabled: errCount ? null : '', onclick: startErrors }, 'Повторити помилки'),
-          errCount ? el('button', { class: 'btn small danger', onclick: () => { if (confirm('Очистити список помилок?')) { store.errors = {}; saveStore(); home(); } } }, 'Очистити') : null))),
+          errCount ? el('button', { class: 'btn small danger', onclick: () => { if (confirm('Очистити список помилок?')) { store.errors = {}; store.errorsClearedAt = new Date().toISOString(); saveStore(); home(); } } }, 'Очистити') : null))),
     signInOffer(),
     el('h2', { class: 'sec' }, 'Варіанти'),
     el('div', { class: 'card' }, variantTable()),
@@ -342,7 +345,7 @@ function home() {
     el('div', { class: 'card row small' },
       el('button', { class: 'btn small', onclick: exportProgress }, 'Експорт прогресу'),
       el('label', { class: 'btn small' }, 'Імпорт прогресу', el('input', { type: 'file', accept: 'application/json', class: 'hidden', onchange: importProgress })),
-      el('button', { class: 'btn small danger', onclick: () => { if (confirm('Видалити весь прогрес у цьому браузері?')) { store = emptyStore(); saveStore(); home(); } } }, 'Скинути все'),
+      el('button', { class: 'btn small danger', onclick: () => { if (confirm(window.TZNK_SYNC && window.TZNK_SYNC.isSignedIn() ? 'Видалити весь прогрес, разом із хмарною копією?' : 'Видалити весь прогрес у цьому браузері?')) { store = emptyStore(); store.resetAt = new Date().toISOString(); saveStore(); home(); } } }, 'Скинути все'),
       el('span', { class: 'muted' }, `Дані оновлено ${DATA.generated}.`)));
   show(node);
 }
@@ -472,7 +475,7 @@ function renderItem(item, variantId, opts) {
 function startSim(variantId, saved) {
   const v = variantById(variantId);
   const state = saved || { variantId: v.id, answers: {}, remaining: EXAM_MINUTES * 60, started: new Date().toISOString(), idx: 0 };
-  store.inProgress = state; saveStore();
+  setInProgress(state); saveStore();
   let idx = state.idx || 0;
 
   const timer = el('span', { class: 'timer' }, fmtTime(state.remaining));
@@ -488,7 +491,7 @@ function startSim(variantId, saved) {
       el('button', { class: 'btn primary', onclick: () => go(idx + 1) }, 'Далі →')));
   show(root);
 
-  function persist() { state.idx = idx; store.inProgress = state; saveStore(); }
+  function persist() { state.idx = idx; setInProgress(state); saveStore(); }
   function renderNav() {
     nav.replaceChildren(...v.items.map((it, i) => el('button', { class: (i === idx ? 'cur ' : '') + (state.answers[it.n] ? 'done' : ''), onclick: () => go(i) }, it.n)));
   }
@@ -507,7 +510,7 @@ function startSim(variantId, saved) {
       if (ok) attempt.score++;
       recordAnswer(it, v.id, ok);
     }
-    store.attempts.push(attempt); store.inProgress = null; saveStore();
+    store.attempts.push(attempt); setInProgress(null); saveStore();
     showResult(attempt);
   }
   timerHandle = setInterval(() => {

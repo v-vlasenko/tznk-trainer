@@ -9,7 +9,7 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
       allow write: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['attempts', 'errors', 'drill', 'sessions', 'inProgress', 'name', 'email', 'photo', 'updatedAt', 'device'])
+        && request.resource.data.keys().hasOnly(['attempts', 'errors', 'drill', 'sessions', 'inProgress', 'inProgressAt', 'errorsClearedAt', 'resetAt', 'savedAt', 'name', 'email', 'photo', 'updatedAt', 'device'])
         && request.resource.size() < 900000;
     }
     match /{document=**} {

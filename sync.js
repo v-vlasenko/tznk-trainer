@@ -28,7 +28,15 @@ const { el } = APP;
 // Two copies of the store (this device and the cloud) may both have changed.
 // Union of histories, max of counters: nothing a device recorded is ever lost.
 function mergeStores(a, b) {
-  const out = { attempts: [], errors: {}, drill: {}, sessions: [], inProgress: null };
+  const later = (x, y) => (x || '') > (y || '') ? x : y;
+  // A full reset on one device wipes copies that were last saved before it.
+  const resetAt = later(a.resetAt, b.resetAt);
+  const wiped = s => ({ ...emptyLike(), resetAt: s.resetAt, savedAt: s.savedAt });
+  if (resetAt && (a.savedAt || '') < resetAt && a.resetAt !== resetAt) a = wiped(a);
+  if (resetAt && (b.savedAt || '') < resetAt && b.resetAt !== resetAt) b = wiped(b);
+  const out = emptyLike();
+  out.resetAt = resetAt;
+  out.savedAt = later(a.savedAt, b.savedAt);
   const byDate = new Map();
   for (const x of [...(a.attempts || []), ...(b.attempts || [])]) byDate.set(x.date, x);
   out.attempts = [...byDate.values()].sort((x, y) => x.date.localeCompare(y.date));
@@ -37,20 +45,28 @@ function mergeStores(a, b) {
   out.sessions = [...sess.values()].sort((x, y) => x.date.localeCompare(y.date));
   for (const k of new Set([...Object.keys(a.drill || {}), ...Object.keys(b.drill || {})])) {
     const x = (a.drill || {})[k] || { ok: 0, bad: 0 }, y = (b.drill || {})[k] || { ok: 0, bad: 0 };
-    out.drill[k] = { ok: Math.max(x.ok, y.ok), bad: Math.max(x.bad, y.bad) };
+    out.drill[k] = { ok: Math.max(x.ok, y.ok), bad: Math.max(x.bad, y.bad), lastOk: later(x.lastOk, y.lastOk) };
   }
+  // An error survives only if nobody cleared the list or answered it correctly after it was recorded.
+  out.errorsClearedAt = later(a.errorsClearedAt, b.errorsClearedAt);
   for (const k of new Set([...Object.keys(a.errors || {}), ...Object.keys(b.errors || {})])) {
     const x = (a.errors || {})[k], y = (b.errors || {})[k];
-    out.errors[k] = !x ? y : !y ? x : { count: Math.max(x.count, y.count), last: [x.last, y.last].sort().pop() };
+    const e = !x ? y : !y ? x : { count: Math.max(x.count, y.count), last: later(x.last, y.last) };
+    if ((e.last || '') <= (out.errorsClearedAt || '')) continue;
+    if ((e.last || '') < ((out.drill[k] || {}).lastOk || '')) continue;
+    out.errors[k] = e;
   }
-  const p = [a.inProgress, b.inProgress].filter(Boolean).sort((x, y) => (x.started || '').localeCompare(y.started || ''));
-  out.inProgress = p.pop() || null;
+  // The exam in progress: whichever device touched it last decides, including clearing it.
+  const src = (a.inProgressAt || '') >= (b.inProgressAt || '') ? a : b;
+  out.inProgress = src.inProgress || null;
+  out.inProgressAt = later(a.inProgressAt, b.inProgressAt);
   return out;
 }
+const emptyLike = () => ({ attempts: [], errors: {}, drill: {}, sessions: [], inProgress: null, inProgressAt: null, errorsClearedAt: null, resetAt: null, savedAt: null });
 
+const FIELDS = ['attempts', 'errors', 'drill', 'sessions', 'inProgress', 'inProgressAt', 'errorsClearedAt', 'resetAt', 'savedAt'];
 function fingerprint(store) {
-  const { attempts, errors, drill, sessions, inProgress } = store;
-  return JSON.stringify({ attempts, errors, drill, sessions, inProgress });
+  return JSON.stringify(FIELDS.map(f => store[f] ?? null));
 }
 
 // ---------- cloud ----------
@@ -62,9 +78,10 @@ async function pushNow() {
   const fp = fingerprint(store);
   if (fp === lastPushed) return;
   lastPushed = fp;
-  const { attempts, errors, drill, sessions, inProgress } = store;
+  const data = {};
+  for (const f of FIELDS) data[f] = store[f] ?? null;
   await setDoc(userDoc(), {
-    attempts, errors, drill, sessions: sessions || [], inProgress,
+    ...data,
     name: user.displayName || '', email: user.email || '', photo: user.photoURL || '',
     updatedAt: serverTimestamp(), device: navigator.userAgent.slice(0, 80),
   });
@@ -116,7 +133,7 @@ function renderSlot() {
     el('span', { class: 'drop' },
       el('span', { class: 'who' }, user.displayName || '', el('br'), user.email || ''),
       isAdmin() ? el('button', { class: 'btn small', onclick: showAll }, 'Прогрес усіх') : null,
-      el('button', { class: 'btn small', onclick: () => signOut(auth) }, 'Вийти')));
+      el('button', { class: 'btn small', onclick: leave }, 'Вийти')));
   document.addEventListener('click', () => menu.classList.remove('open'));
   slot.replaceChildren(menu);
 }
@@ -128,6 +145,17 @@ async function signIn() {
       await signInWithRedirect(auth, provider);
     } else { alert('Не вдалося увійти: ' + (e.code || e.message)); console.warn(e); }
   }
+}
+
+// Sign out: upload what is pending, then clear this device so the next person starts clean.
+async function leave() {
+  if (!confirm('Вийти? Прогрес збережено в хмарі, на цьому пристрої він буде очищений.')) return;
+  clearTimeout(pushTimer);
+  try { await pushNow(); } catch (e) { if (!confirm('Не вдалося дозаписати прогрес у хмару. Все одно вийти?')) return; }
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  await signOut(auth);
+  APP.setStore({});
+  APP.rerenderHome();
 }
 
 function isAdmin() { return !!user && (cfg.admins || []).includes(user.email); }
