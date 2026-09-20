@@ -28,7 +28,7 @@ const { el } = APP;
 // Two copies of the store (this device and the cloud) may both have changed.
 // Union of histories, max of counters: nothing a device recorded is ever lost.
 function mergeStores(a, b) {
-  const later = (x, y) => (x || '') > (y || '') ? x : y;
+  const later = (x, y) => ((x || '') > (y || '') ? x : y) || null;
   // A full reset on one device wipes copies that were last saved before it.
   const resetAt = later(a.resetAt, b.resetAt);
   const wiped = s => ({ ...emptyLike(), resetAt: s.resetAt, savedAt: s.savedAt });
@@ -80,8 +80,10 @@ async function pushNow() {
   lastPushed = fp;
   const data = {};
   for (const f of FIELDS) data[f] = store[f] ?? null;
+  // Firestore rejects undefined anywhere in the document; JSON round-trip drops such keys.
+  const clean = JSON.parse(JSON.stringify(data));
   await setDoc(userDoc(), {
-    ...data,
+    ...clean,
     name: user.displayName || '', email: user.email || '', photo: user.photoURL || '',
     updatedAt: serverTimestamp(), device: navigator.userAgent.slice(0, 80),
   });
@@ -115,7 +117,7 @@ function listen() {
 function setStatus(text, err) {
   if (err) console.warn('sync:', err);
   const s = slot.querySelector('.sync-status');
-  if (s) s.textContent = text;
+  if (s) { s.textContent = text; s.title = err ? (err.code || err.message || String(err)) : ''; }
 }
 
 function renderSlot() {
