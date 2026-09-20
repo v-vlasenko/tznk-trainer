@@ -247,9 +247,12 @@ let store = emptyStore();
 function loadStore() {
   try { const raw = localStorage.getItem(STORE_KEY); if (raw) store = Object.assign(emptyStore(), JSON.parse(raw)); } catch (e) { store = emptyStore(); }
 }
+function saveLocal() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* private mode */ }
+}
 function saveStore() {
   store.savedAt = new Date().toISOString();
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* private mode */ }
+  saveLocal();
   if (window.TZNK_SYNC) window.TZNK_SYNC.schedulePush();
 }
 // Hooks for sync.js (cloud sync is optional and lives in a separate module).
@@ -517,7 +520,7 @@ function startSim(variantId, saved) {
     showResult(attempt);
   }
   timerHandle = setInterval(() => {
-    state.remaining--; persist();
+    state.remaining--; store.inProgress = state; saveLocal(); // the clock alone is not worth a cloud write
     timer.textContent = fmtTime(Math.max(0, state.remaining));
     timer.classList.toggle('low', state.remaining <= 300);
     if (state.remaining <= 0) { alert('Час вийшов. Тест завершено.'); finish(); }

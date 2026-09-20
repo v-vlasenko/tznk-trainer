@@ -55,9 +55,15 @@ function mergeStores(a, b) {
     if ((e.last || '') < ((out.drill[k] || {}).lastOk || '')) continue;
     out.errors[k] = e;
   }
-  // The exam in progress: whichever device touched it last decides, including clearing it.
-  const src = (a.inProgressAt || '') >= (b.inProgressAt || '') ? a : b;
-  out.inProgress = src.inProgress || null;
+  // The exam in progress: the device that touched it last decides, including clearing it.
+  // The same exam continued on two devices keeps the answers of both.
+  const [newer, older] = (a.inProgressAt || '') >= (b.inProgressAt || '') ? [a, b] : [b, a];
+  const n = newer.inProgress, o = older.inProgress;
+  if (n && o && n.variantId === o.variantId && n.started === o.started) {
+    out.inProgress = { ...n, answers: { ...o.answers, ...n.answers }, remaining: Math.min(n.remaining, o.remaining) };
+  } else {
+    out.inProgress = n || null;
+  }
   out.inProgressAt = later(a.inProgressAt, b.inProgressAt);
   return out;
 }
@@ -104,7 +110,9 @@ function schedulePush() {
 // visit instead of a permanent realtime channel.
 let pulling = false;
 async function pull() {
-  if (!user || pulling) return;
+  // Only on the start page: a running exam or drill holds its own state object,
+  // replacing the store underneath it would be lost on the next save anyway.
+  if (!user || pulling || !APP.isHome()) return;
   pulling = true;
   try {
     const snap = await getDoc(userDoc());
