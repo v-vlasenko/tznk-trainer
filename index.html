@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ТЗНК тренажер</title>
+<meta name="description" content="Тренажер для підготовки до ТЗНК (ЄВІ): симуляція іспиту, тренування з поясненнями, повторення помилок.">
+<style>
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --text: #1c1f26; --muted: #6b7280; --line: #e3e6eb;
+  --accent: #2f5fd8; --accent-soft: #e6ecfb; --ok: #1f8f4e; --ok-soft: #e3f5ea;
+  --bad: #c8362f; --bad-soft: #fbe6e4; --warn: #b7791f; --warn-soft: #fdf3dc;
+  --radius: 12px; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12141a; --card: #1b1e27; --text: #e7e9ee; --muted: #9aa1ad; --line: #2b2f3a;
+    --accent: #7b9dff; --accent-soft: #232b45; --ok: #4cc27a; --ok-soft: #1c3327;
+    --bad: #ff7b72; --bad-soft: #3a2220; --warn: #e0b04f; --warn-soft: #3a3020;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12141a; --card: #1b1e27; --text: #e7e9ee; --muted: #9aa1ad; --line: #2b2f3a;
+  --accent: #7b9dff; --accent-soft: #232b45; --ok: #4cc27a; --ok-soft: #1c3327;
+  --bad: #ff7b72; --bad-soft: #3a2220; --warn: #e0b04f; --warn-soft: #3a3020;
+  --shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+button { font: inherit; color: inherit; cursor: pointer; }
+img { max-width: 100%; height: auto; }
+table { border-collapse: collapse; margin: .5em 0; }
+td, th { border: 1px solid var(--line); padding: 4px 8px; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+header.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--card);
+  position: sticky; top: 0; z-index: 5;
+}
+header.top h1 { font-size: 18px; margin: 0; font-weight: 650; }
+header.top .sub { color: var(--muted); font-size: 13px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.mode { display: flex; flex-direction: column; gap: 10px; }
+.mode h2 { margin: 0; font-size: 18px; }
+.mode p { margin: 0; color: var(--muted); font-size: 14px; flex: 1; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn {
+  border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 9px 14px;
+  font-weight: 550; transition: background .12s, border-color .12s;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.small { padding: 5px 10px; font-size: 14px; }
+select, input[type=number] {
+  font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; padding: 8px 10px;
+}
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.stat .v { font-size: 26px; font-weight: 700; line-height: 1.1; }
+.stat .l { color: var(--muted); font-size: 13px; }
+.muted { color: var(--muted); }
+.small { font-size: 14px; }
+h2.sec { font-size: 16px; margin: 22px 0 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+table.hist { width: 100%; font-size: 14px; }
+table.hist td, table.hist th { border: 0; border-bottom: 1px solid var(--line); text-align: left; padding: 8px 6px; }
+table.hist th { color: var(--muted); font-weight: 600; }
+
+/* quiz */
+.qbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.qbar .timer { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 20px; padding: 4px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); }
+.qbar .timer.low { background: var(--bad-soft); color: var(--bad); }
+.qbar .spacer { flex: 1; }
+.nav { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+.nav button {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+  font-size: 13px; font-weight: 600; padding: 0;
+}
+.nav button.cur { outline: 2px solid var(--accent); outline-offset: 1px; }
+.nav button.done { background: var(--accent-soft); border-color: transparent; }
+.nav button.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.nav button.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.qlayout { display: grid; gap: 14px; grid-template-columns: 1fr; }
+.qlayout.has-passage { grid-template-columns: 1fr; }
+@media (min-width: 960px) {
+  .qlayout.has-passage { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+  .passage { position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow: auto; }
+}
+.passage { font-size: 15px; line-height: 1.6; max-height: 45vh; overflow: auto; }
+@media (min-width: 960px) { .passage { max-height: calc(100vh - 90px); } }
+.passage p { margin: .5em 0; }
+.qhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.qhead .n { font-weight: 700; }
+.qhead .tag { color: var(--muted); font-size: 13px; }
+.question { font-size: 17px; }
+.question p { margin: .5em 0; }
+.answers { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.ans {
+  display: flex; gap: 12px; align-items: flex-start; text-align: left; width: 100%;
+  border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 10px 12px;
+  transition: background .12s, border-color .12s;
+}
+.ans:hover:not(:disabled) { border-color: var(--accent); }
+.ans .k {
+  flex: 0 0 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--bg); font-weight: 700; font-size: 14px;
+}
+.ans.sel { border-color: var(--accent); background: var(--accent-soft); }
+.ans.sel .k { background: var(--accent); color: #fff; }
+.ans.ok { border-color: var(--ok); background: var(--ok-soft); }
+.ans.ok .k { background: var(--ok); color: #fff; }
+.ans.bad { border-color: var(--bad); background: var(--bad-soft); }
+.ans.bad .k { background: var(--bad); color: #fff; }
+.ans:disabled { cursor: default; }
+.expl { margin-top: 14px; padding: 14px 16px; border-radius: 10px; background: var(--warn-soft); border: 1px solid transparent; font-size: 15px; }
+.expl p { margin: .5em 0; }
+.expl .t { font-weight: 700; margin-bottom: 4px; }
+.expl .legend { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.verdict { font-weight: 700; margin-top: 12px; }
+.verdict.ok { color: var(--ok); } .verdict.bad { color: var(--bad); }
+.qactions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; justify-content: space-between; }
+.hidden { display: none !important; }
+
+/* result */
+.score { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+.score .big { font-size: 48px; font-weight: 800; line-height: 1; }
+.score .scale { font-size: 22px; font-weight: 700; color: var(--accent); }
+.bars { display: grid; gap: 8px; margin-top: 16px; }
+.bar { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; font-size: 14px; }
+.bar .track { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--bg); overflow: hidden; }
+.bar .fill { height: 100%; background: var(--ok); }
+.list { display: grid; gap: 8px; margin-top: 14px; }
+.item { display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 16px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>ТЗНК тренажер</h1>
+    <div class="sub" id="subtitle">ЄВІ · 27 завдань · 33 бали · 75 хвилин</div>
+  </div>
+  <div class="row">
+    <button class="btn small" id="homeBtn">Головна</button>
+  </div>
+</header>
+
+<main class="wrap" id="app">
+  <div class="card">Завантаження даних…</div>
+</main>
+
+<footer>
+  Завдання та пояснення: <a href="https://zno.osvita.ua/master/tznpk/" target="_blank" rel="noopener">ЗНО-онлайн (Освіта.ua)</a>.
+  Формат і шкала: <a href="https://testportal.gov.ua/yedynyj-vstupnyj-ispyt-2026/" target="_blank" rel="noopener">УЦОЯО</a>.
+  Прогрес зберігається лише в цьому браузері.
+</footer>
+
+<script src="data.js"></script>
+<script>
+'use strict';
+const EXAM_MINUTES = 75;
+const MAX_POINTS = 33;
+// Таблиця переведення тестових балів ТЗНК у шкалу 100–200 (Порядок прийому 2026).
+const SCALE = {5:100,6:104,7:108,8:112,9:116,10:120,11:125,12:130,13:135,14:139,15:143,16:147,17:151,18:153,
+  19:156,20:159,21:162,22:165,23:168,24:171,25:175,26:179,27:182,28:185,29:187,30:190,31:193,32:196,33:200};
+const SECTION_RANGE = { lexis: [1, 10], reading: [11, 18], logic: [19, 33] };
+const STORE_KEY = 'tznk.v1';
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const el = (tag, attrs = {}, ...children) => {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') node.className = v;
+    else if (k === 'html') node.innerHTML = v;
+    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined) node.setAttribute(k, v);
+  }
+  for (const c of children.flat()) {
+    if (c === null || c === undefined || c === false) continue;
+    node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return node;
+};
+const fmtTime = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const fmtDate = iso => new Date(iso).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const scaleOf = pts => pts >= 5 ? SCALE[pts] : null;
+const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const keyOf = (v, n) => `${v}:${n}`;
+
+// ---------- storage ----------
+const emptyStore = () => ({ attempts: [], errors: {}, drill: {}, inProgress: null });
+let store = emptyStore();
+function loadStore() {
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) store = Object.assign(emptyStore(), JSON.parse(raw)); } catch (e) { store = emptyStore(); }
+}
+function saveStore() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* private mode */ } }
+function recordAnswer(item, variantId, correct) {
+  const k = keyOf(variantId, item.n);
+  const d = store.drill[k] || (store.drill[k] = { ok: 0, bad: 0 });
+  if (correct) {
+    d.ok++;
+    if (store.errors[k]) delete store.errors[k];
+  } else {
+    d.bad++;
+    const e = store.errors[k] || (store.errors[k] = { count: 0 });
+    e.count++; e.last = new Date().toISOString();
+  }
+  saveStore();
+}
+
+// ---------- data ----------
+let DATA = null;
+const variantById = id => DATA.variants.find(v => v.id === Number(id));
+const allItems = () => DATA.variants.flatMap(v => v.items.map(it => ({ item: it, variantId: v.id })));
+
+// ---------- screens ----------
+const app = $('#app');
+let timerHandle = null;
+function stopTimer() { if (timerHandle) { clearInterval(timerHandle); timerHandle = null; } }
+function show(node) { stopTimer(); app.replaceChildren(node); window.scrollTo({ top: 0 }); }
+
+function home() {
+  const attempts = store.attempts.slice().reverse();
+  const errCount = Object.keys(store.errors).length;
+  const drilled = Object.values(store.drill);
+  const okSum = drilled.reduce((s, d) => s + d.ok, 0), badSum = drilled.reduce((s, d) => s + d.bad, 0);
+  const acc = okSum + badSum ? Math.round(100 * okSum / (okSum + badSum)) : null;
+  const best = attempts.length ? Math.max(...attempts.map(a => a.score)) : null;
+
+  const variantOpts = DATA.variants.map(v => el('option', { value: v.id }, shortTitle(v)));
+  const simSel = el('select', {}, ...variantOpts.map(o => o.cloneNode(true)));
+  const drillSel = el('select', {}, el('option', { value: 'all' }, 'Усі варіанти'), ...variantOpts.map(o => o.cloneNode(true)));
+  const secSel = el('select', {}, el('option', { value: 'all' }, 'Усі блоки'),
+    ...Object.entries(DATA.sections).map(([k, t]) => el('option', { value: k }, t)));
+  const onlyNew = el('input', { type: 'checkbox', checked: '' });
+
+  const resume = store.inProgress ? el('div', { class: 'card', style: 'margin-bottom:14px;border-color:var(--warn)' },
+    el('div', { class: 'row', style: 'justify-content:space-between' },
+      el('div', {}, el('b', {}, 'Незавершена симуляція: '), shortTitle(variantById(store.inProgress.variantId)),
+        el('span', { class: 'muted small' }, ` · ${Object.keys(store.inProgress.answers).length} відповідей · залишилось ${fmtTime(store.inProgress.remaining)}`)),
+      el('div', { class: 'row' },
+        el('button', { class: 'btn primary small', onclick: () => startSim(store.inProgress.variantId, store.inProgress) }, 'Продовжити'),
+        el('button', { class: 'btn small danger', onclick: () => { store.inProgress = null; saveStore(); home(); } }, 'Скинути')))) : null;
+
+  const node = el('div', {},
+    el('div', { class: 'stats' },
+      el('div', { class: 'stat' }, el('div', { class: 'v' }, attempts.length), el('div', { class: 'l' }, 'симуляцій пройдено')),
+      el('div', { class: 'stat' }, el('div', { class: 'v' }, best === null ? '—' : `${best}/${MAX_POINTS}`), el('div', { class: 'l' }, best !== null && scaleOf(best) ? `найкращий · ${scaleOf(best)} балів` : 'найкращий результат')),
+      el('div', { class: 'stat' }, el('div', { class: 'v' }, acc === null ? '—' : `${acc}%`), el('div', { class: 'l' }, `точність · ${okSum + badSum} відповідей`)),
+      el('div', { class: 'stat' }, el('div', { class: 'v', style: errCount ? 'color:var(--bad)' : '' }, errCount), el('div', { class: 'l' }, 'помилок до повторення'))),
+    resume,
+    el('div', { class: 'grid' },
+      el('div', { class: 'card mode' },
+        el('h2', {}, 'Симуляція іспиту'),
+        el('p', {}, `Повний варіант: 33 пункти, ${EXAM_MINUTES} хвилин, без підказок. Результат у тестових балах і за шкалою 100–200. Порядок відповідей як в оригіналі.`),
+        el('div', { class: 'row' }, simSel, el('button', { class: 'btn primary', onclick: () => startSim(simSel.value) }, 'Почати'))),
+      el('div', { class: 'card mode' },
+        el('h2', {}, 'Тренажер'),
+        el('p', {}, 'По одному завданню з миттєвою перевіркою. Пояснення відкривається автоматично при помилці. Варіанти відповідей перемішані.'),
+        el('div', { class: 'row' }, drillSel, secSel),
+        el('label', { class: 'row small muted' }, onlyNew, ' лише ще не розв’язані правильно'),
+        el('div', { class: 'row' }, el('button', { class: 'btn primary', onclick: () => startDrill(drillSel.value, secSel.value, onlyNew.checked) }, 'Почати'))),
+      el('div', { class: 'card mode' },
+        el('h2', {}, 'Робота над помилками'),
+        el('p', {}, errCount ? `${errCount} завдань, на які була неправильна відповідь. Правильна відповідь прибирає завдання зі списку.` : 'Список порожній. Помилки з симуляцій і тренажера з’являться тут.'),
+        el('div', { class: 'row' },
+          el('button', { class: 'btn primary', disabled: errCount ? null : '', onclick: startErrors }, 'Повторити помилки'),
+          errCount ? el('button', { class: 'btn small danger', onclick: () => { if (confirm('Очистити список помилок?')) { store.errors = {}; saveStore(); home(); } } }, 'Очистити') : null))),
+    el('h2', { class: 'sec' }, 'Варіанти'),
+    el('div', { class: 'card' }, variantTable()),
+    attempts.length ? el('h2', { class: 'sec' }, 'Історія симуляцій') : null,
+    attempts.length ? el('div', { class: 'card' }, historyTable(attempts)) : null,
+    el('h2', { class: 'sec' }, 'Дані'),
+    el('div', { class: 'card row small' },
+      el('button', { class: 'btn small', onclick: exportProgress }, 'Експорт прогресу'),
+      el('label', { class: 'btn small' }, 'Імпорт прогресу', el('input', { type: 'file', accept: 'application/json', class: 'hidden', onchange: importProgress })),
+      el('button', { class: 'btn small danger', onclick: () => { if (confirm('Видалити весь прогрес у цьому браузері?')) { store = emptyStore(); saveStore(); home(); } } }, 'Скинути все'),
+      el('span', { class: 'muted' }, `Дані оновлено ${DATA.generated}.`)));
+  show(node);
+}
+function shortTitle(v) { return v.title.replace(/^Тренувальний ТЗНК в магістратуру\.\s*/, ''); }
+function variantTable() {
+  const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Варіант'), el('th', {}, 'Симуляцій'), el('th', {}, 'Найкращий'), el('th', {}, 'Розв’язано в тренажері'), el('th', {}, 'Помилок')));
+  for (const v of DATA.variants) {
+    const att = store.attempts.filter(a => a.variantId === v.id);
+    const best = att.length ? Math.max(...att.map(a => a.score)) : null;
+    const solved = v.items.filter(it => (store.drill[keyOf(v.id, it.n)] || {}).ok > 0).length;
+    const errs = v.items.filter(it => store.errors[keyOf(v.id, it.n)]).length;
+    t.append(el('tr', {}, el('td', {}, el('a', { href: v.source, target: '_blank', rel: 'noopener' }, shortTitle(v))),
+      el('td', {}, att.length), el('td', {}, best === null ? '—' : `${best}/${MAX_POINTS}`), el('td', {}, `${solved}/${v.items.length}`), el('td', {}, errs || '—')));
+  }
+  return t;
+}
+function historyTable(attempts) {
+  const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Дата'), el('th', {}, 'Варіант'), el('th', {}, 'Бали'), el('th', {}, 'Шкала'), el('th', {}, 'Час'), el('th', {}, '')));
+  for (const a of attempts) {
+    t.append(el('tr', {}, el('td', {}, fmtDate(a.date)), el('td', {}, shortTitle(variantById(a.variantId))),
+      el('td', {}, `${a.score}/${MAX_POINTS}`), el('td', {}, scaleOf(a.score) ?? 'не склала'), el('td', {}, fmtTime(a.seconds)),
+      el('td', {}, el('button', { class: 'btn small', onclick: () => showResult(a) }, 'Розбір'))));
+  }
+  return t;
+}
+function exportProgress() {
+  const blob = new Blob([JSON.stringify(store, null, 1)], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: `tznk-progress-${new Date().toISOString().slice(0, 10)}.json` });
+  document.body.append(a); a.click(); a.remove();
+}
+function importProgress(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  f.text().then(txt => { const s = JSON.parse(txt); if (!s.attempts || !s.errors) throw new Error('bad'); store = Object.assign(emptyStore(), s); saveStore(); home(); })
+    .catch(() => alert('Файл не схожий на експорт прогресу.'));
+}
+
+// ---------- rendering of one item ----------
+function renderItem(item, variantId, opts) {
+  // opts: { order: ['А','Б','В','Г'] display order of original letters, selected, revealed, onSelect, showExplanation }
+  const order = opts.order || item.answers.map(a => a.letter);
+  const letters = ['А', 'Б', 'В', 'Г'];
+  const byLetter = Object.fromEntries(item.answers.map(a => [a.letter, a]));
+  const answers = el('div', { class: 'answers' });
+  order.forEach((orig, idx) => {
+    const a = byLetter[orig];
+    const cls = ['ans'];
+    if (opts.revealed) {
+      if (orig === item.correct) cls.push('ok');
+      else if (orig === opts.selected) cls.push('bad');
+    } else if (orig === opts.selected) cls.push('sel');
+    answers.append(el('button', { class: cls.join(' '), disabled: opts.revealed ? '' : null, onclick: () => opts.onSelect && opts.onSelect(orig) },
+      el('span', { class: 'k' }, letters[idx]), el('span', { html: a.html })));
+  });
+  const shuffled = order.some((l, i) => l !== letters[i]);
+  const body = el('div', { class: 'card' },
+    el('div', { class: 'qhead' }, el('span', { class: 'n' }, `Завдання ${item.n}`), el('span', { class: 'tag' }, DATA.sections[item.section])),
+    el('div', { class: 'question', html: item.question }),
+    answers);
+  if (opts.revealed) {
+    const ok = opts.selected === item.correct;
+    const shownCorrect = shuffled ? letters[order.indexOf(item.correct)] : item.correct;
+    const correctText = byLetter[item.correct].html.replace(/<[^>]+>/g, '');
+    body.append(el('div', { class: 'verdict ' + (ok ? 'ok' : 'bad') },
+      ok ? 'Правильно' : `${opts.selected ? 'Неправильно' : 'Без відповіді'}. Правильна відповідь: ${shownCorrect} — «${correctText}»`));
+    if (item.explanation) {
+      const expl = el('div', { class: 'expl' + (opts.showExplanation ? '' : ' hidden') },
+        el('div', { class: 't' }, 'Пояснення'),
+        shuffled ? el('div', { class: 'legend' }, 'Варіанти тут перемішані. У поясненні літери за оригіналом: ',
+          item.answers.map(a => `${a.letter} → тут ${letters[order.indexOf(a.letter)]}`).join(', '), '.') : null,
+        el('div', { html: item.explanation }));
+      body.append(expl);
+      if (!opts.showExplanation) {
+        const b = el('button', { class: 'btn small', style: 'margin-top:10px', onclick: () => { expl.classList.remove('hidden'); b.remove(); } }, 'Показати пояснення');
+        body.append(b);
+      }
+    }
+  }
+  const layout = el('div', { class: 'qlayout' + (item.passage ? ' has-passage' : '') });
+  if (item.passage) layout.append(el('div', { class: 'card passage', html: item.passage }));
+  layout.append(body);
+  return layout;
+}
+
+// ---------- simulation ----------
+function startSim(variantId, saved) {
+  const v = variantById(variantId);
+  const state = saved || { variantId: v.id, answers: {}, remaining: EXAM_MINUTES * 60, started: new Date().toISOString(), idx: 0 };
+  store.inProgress = state; saveStore();
+  let idx = state.idx || 0;
+
+  const timer = el('span', { class: 'timer' }, fmtTime(state.remaining));
+  const nav = el('div', { class: 'nav' });
+  const body = el('div', {});
+  const root = el('div', {},
+    el('div', { class: 'qbar' }, el('b', {}, 'Симуляція · ' + shortTitle(v)), el('span', { class: 'spacer' }), timer,
+      el('button', { class: 'btn small', onclick: () => { if (confirm('Вийти? Прогрес симуляції збережеться, таймер зупиниться.')) home(); } }, 'Вийти')),
+    nav, body,
+    el('div', { class: 'qactions' },
+      el('button', { class: 'btn', onclick: () => go(idx - 1) }, '← Назад'),
+      el('button', { class: 'btn danger', onclick: () => { const left = v.items.length - Object.keys(state.answers).length; if (confirm(left ? `Без відповіді: ${left}. Завершити?` : 'Завершити тест?')) finish(); } }, 'Завершити тест'),
+      el('button', { class: 'btn primary', onclick: () => go(idx + 1) }, 'Далі →')));
+  show(root);
+
+  function persist() { state.idx = idx; store.inProgress = state; saveStore(); }
+  function renderNav() {
+    nav.replaceChildren(...v.items.map((it, i) => el('button', { class: (i === idx ? 'cur ' : '') + (state.answers[it.n] ? 'done' : ''), onclick: () => go(i) }, it.n)));
+  }
+  function go(i) {
+    idx = Math.max(0, Math.min(v.items.length - 1, i));
+    const it = v.items[idx];
+    body.replaceChildren(renderItem(it, v.id, { selected: state.answers[it.n], onSelect: l => { state.answers[it.n] = l; persist(); go(idx); } }));
+    renderNav(); persist();
+    window.scrollTo({ top: 0 });
+  }
+  function finish() {
+    stopTimer();
+    const attempt = { variantId: v.id, date: new Date().toISOString(), seconds: EXAM_MINUTES * 60 - state.remaining, answers: state.answers, score: 0 };
+    for (const it of v.items) {
+      const ok = state.answers[it.n] === it.correct;
+      if (ok) attempt.score++;
+      recordAnswer(it, v.id, ok);
+    }
+    store.attempts.push(attempt); store.inProgress = null; saveStore();
+    showResult(attempt);
+  }
+  timerHandle = setInterval(() => {
+    state.remaining--; persist();
+    timer.textContent = fmtTime(Math.max(0, state.remaining));
+    timer.classList.toggle('low', state.remaining <= 300);
+    if (state.remaining <= 0) { alert('Час вийшов. Тест завершено.'); finish(); }
+  }, 1000);
+  document.onkeydown = e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (['1', '2', '3', '4'].includes(e.key)) { const it = v.items[idx]; state.answers[it.n] = ['А', 'Б', 'В', 'Г'][+e.key - 1]; persist(); go(idx); }
+    else if (e.key === 'ArrowRight' || e.key === 'Enter') go(idx + 1);
+    else if (e.key === 'ArrowLeft') go(idx - 1);
+  };
+  go(idx);
+}
+
+function showResult(attempt) {
+  document.onkeydown = null;
+  const v = variantById(attempt.variantId);
+  const scale = scaleOf(attempt.score);
+  const bars = el('div', { class: 'bars' });
+  for (const [sec, [a, b]] of Object.entries(SECTION_RANGE)) {
+    const its = v.items.filter(it => it.n >= a && it.n <= b);
+    const ok = its.filter(it => attempt.answers[it.n] === it.correct).length;
+    bars.append(el('div', { class: 'bar' }, el('span', {}, DATA.sections[sec]), el('b', {}, `${ok}/${its.length}`),
+      el('div', { class: 'track' }, el('div', { class: 'fill', style: `width:${100 * ok / its.length}%` }))));
+  }
+  const wrong = v.items.filter(it => attempt.answers[it.n] !== it.correct);
+  const list = el('div', { class: 'list' });
+  for (const it of v.items) {
+    const ok = attempt.answers[it.n] === it.correct;
+    list.append(el('div', { class: 'item' },
+      el('span', {}, el('b', {}, `${it.n}. `), el('span', { class: 'muted' }, DATA.sections[it.section])),
+      el('span', { class: 'row' },
+        el('span', { class: 'pill ' + (ok ? 'ok' : 'bad') }, ok ? `✓ ${it.correct}` : (attempt.answers[it.n] ? `${attempt.answers[it.n]} → ${it.correct}` : `— → ${it.correct}`)),
+        el('button', { class: 'btn small', onclick: () => review([it], v.id, attempt, v.items.indexOf(it)) }, 'Розбір'))));
+  }
+  show(el('div', {},
+    el('div', { class: 'card' },
+      el('div', { class: 'score' },
+        el('div', {}, el('div', { class: 'big' }, `${attempt.score}/${MAX_POINTS}`), el('div', { class: 'muted small' }, `тестових балів · ${shortTitle(v)} · ${fmtTime(attempt.seconds)}`)),
+        el('div', {}, el('div', { class: 'scale' }, scale ? `≈ ${scale} балів` : 'поріг не подолано'),
+          el('div', { class: 'muted small' }, scale ? 'орієнтовно, за таблицею переведення 2026' : 'потрібно щонайменше 5 тестових балів'))),
+      bars),
+    el('div', { class: 'row', style: 'margin:14px 0' },
+      wrong.length ? el('button', { class: 'btn primary', onclick: () => review(wrong, v.id, attempt) }, `Розібрати помилки (${wrong.length})`) : el('span', { class: 'verdict ok' }, 'Усі відповіді правильні. 200 балів.'),
+      el('button', { class: 'btn', onclick: () => review(v.items, v.id, attempt) }, 'Переглянути всі'),
+      el('button', { class: 'btn', onclick: home }, 'На головну')),
+    el('div', { class: 'card' }, list)));
+}
+
+// review: walk through items with answers revealed and explanations open
+function review(items, variantId, attempt, startIdx = 0) {
+  let idx = 0;
+  if (startIdx && items.length > 1) idx = Math.max(0, items.findIndex(it => it === variantById(variantId).items[startIdx]));
+  const body = el('div', {});
+  const counter = el('b', {});
+  const root = el('div', {},
+    el('div', { class: 'qbar' }, counter, el('span', { class: 'spacer' }), el('button', { class: 'btn small', onclick: () => showResult(attempt) }, 'До результату')),
+    body,
+    el('div', { class: 'qactions' },
+      el('button', { class: 'btn', onclick: () => go(idx - 1) }, '← Назад'),
+      el('button', { class: 'btn primary', onclick: () => idx + 1 < items.length ? go(idx + 1) : showResult(attempt) }, 'Далі →')));
+  show(root);
+  function go(i) {
+    idx = Math.max(0, Math.min(items.length - 1, i));
+    const it = items[idx];
+    counter.textContent = `Розбір ${idx + 1} / ${items.length}`;
+    body.replaceChildren(renderItem(it, variantId, { selected: attempt.answers[it.n], revealed: true, showExplanation: true }));
+    window.scrollTo({ top: 0 });
+  }
+  document.onkeydown = e => { if (e.key === 'ArrowRight' || e.key === 'Enter') { if (idx + 1 < items.length) go(idx + 1); else showResult(attempt); } else if (e.key === 'ArrowLeft') go(idx - 1); };
+  go(idx);
+}
+
+// ---------- drill / errors ----------
+function startDrill(variantSel, section, onlyNew) {
+  let pool = variantSel === 'all' ? allItems() : variantById(variantSel).items.map(item => ({ item, variantId: Number(variantSel) }));
+  if (section !== 'all') pool = pool.filter(p => p.item.section === section);
+  if (onlyNew) pool = pool.filter(p => !(store.drill[keyOf(p.variantId, p.item.n)] || {}).ok);
+  if (!pool.length) { alert('Немає завдань за цим фільтром. Зніми галочку «лише ще не розв’язані».'); return; }
+  runDrill(shuffleGrouped(pool), 'Тренажер', false);
+}
+function startErrors() {
+  const pool = [];
+  for (const k of Object.keys(store.errors)) {
+    const [vid, n] = k.split(':').map(Number);
+    const v = variantById(vid); const item = v && v.items.find(it => it.n === n);
+    if (item) pool.push({ item, variantId: vid });
+  }
+  if (!pool.length) { home(); return; }
+  runDrill(shuffleGrouped(pool), 'Робота над помилками', true);
+}
+// Keep items that share a passage adjacent (so the text is read once), shuffle the groups.
+function shuffleGrouped(pool) {
+  const groups = new Map();
+  for (const p of pool) {
+    const g = p.item.group ? `${p.variantId}:g${p.item.group}` : `${p.variantId}:${p.item.n}`;
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(p);
+  }
+  return shuffle([...groups.values()]).flatMap(g => g.sort((a, b) => a.item.n - b.item.n));
+}
+function runDrill(pool, title, isErrors) {
+  let idx = 0, ok = 0, bad = 0;
+  const results = [];
+  const counter = el('b', {});
+  const scoreEl = el('span', { class: 'muted' });
+  const body = el('div', {});
+  const nextBtn = el('button', { class: 'btn primary', onclick: next }, 'Далі →');
+  const root = el('div', {},
+    el('div', { class: 'qbar' }, counter, scoreEl, el('span', { class: 'spacer' }), el('button', { class: 'btn small', onclick: () => finishDrill() }, 'Завершити')),
+    body,
+    el('div', { class: 'qactions' }, el('span', {}), nextBtn));
+  show(root);
+  let cur = null;
+  function render() {
+    const { item, variantId } = pool[idx];
+    counter.textContent = `${title} · ${idx + 1} / ${pool.length}`;
+    scoreEl.textContent = `правильно ${ok} · помилок ${bad}`;
+    if (!cur || cur.item !== item) cur = { item, variantId, order: shuffle(item.answers.map(a => a.letter)), selected: null, revealed: false };
+    body.replaceChildren(renderItem(item, variantId, {
+      order: cur.order, selected: cur.selected, revealed: cur.revealed,
+      showExplanation: cur.revealed && cur.selected !== item.correct,
+      onSelect: l => {
+        if (cur.revealed) return;
+        cur.selected = l; cur.revealed = true;
+        const good = l === item.correct;
+        good ? ok++ : bad++;
+        results.push({ item, variantId, good });
+        recordAnswer(item, variantId, good);
+        render();
+        nextBtn.focus();
+      }
+    }));
+    nextBtn.disabled = !cur.revealed;
+  }
+  function next() {
+    if (!cur.revealed) return;
+    if (idx + 1 >= pool.length) { finishDrill(); return; }
+    idx++; render(); window.scrollTo({ top: 0 });
+  }
+  function finishDrill() {
+    document.onkeydown = null;
+    const fixed = results.filter(r => r.good).length;
+    show(el('div', {},
+      el('div', { class: 'card' },
+        el('h2', { style: 'margin-top:0' }, title + ' завершено'),
+        el('div', { class: 'score' },
+          el('div', {}, el('div', { class: 'big' }, `${ok}/${ok + bad}`), el('div', { class: 'muted small' }, 'правильних відповідей у цій сесії')),
+          isErrors ? el('div', { class: 'muted' }, `Виправлено: ${fixed}. Залишилось у списку: ${Object.keys(store.errors).length}.`) : null),
+        results.filter(r => !r.good).length ? el('div', { class: 'list' },
+          ...results.filter(r => !r.good).map(r => el('div', { class: 'item' },
+            el('span', {}, el('b', {}, `${shortTitle(variantById(r.variantId))}, завдання ${r.item.n}`), ' ', el('span', { class: 'muted' }, DATA.sections[r.item.section])),
+            el('span', { class: 'pill bad' }, `правильно: ${r.item.correct}`)))) : null),
+      el('div', { class: 'row', style: 'margin-top:14px' },
+        Object.keys(store.errors).length ? el('button', { class: 'btn primary', onclick: startErrors }, 'Повторити помилки') : null,
+        el('button', { class: 'btn', onclick: home }, 'На головну'))));
+  }
+  document.onkeydown = e => {
+    if (['1', '2', '3', '4'].includes(e.key) && cur && !cur.revealed) { const btn = body.querySelectorAll('.ans')[+e.key - 1]; if (btn) btn.click(); }
+    else if (e.key === 'ArrowRight' || e.key === 'Enter') { if (document.activeElement && document.activeElement.classList.contains('ans')) return; next(); }
+  };
+  render();
+}
+
+// ---------- boot ----------
+$('#homeBtn').addEventListener('click', () => {
+  if (timerHandle && !confirm('Вийти? Прогрес симуляції збережеться, таймер зупиниться.')) return;
+  document.onkeydown = null; home();
+});
+loadStore();
+function boot() {
+  const d = window.TZNK_DATA;
+  if (!d) { app.replaceChildren(el('div', { class: 'card' }, 'Не знайдено data.js поруч з index.html. Запусти scrape.py, щоб згенерувати дані.')); return; }
+  DATA = d;
+  $('#subtitle').textContent = `ЄВІ · ${d.variants.length} варіантів · ${d.variants.reduce((s, v) => s + v.items.length, 0)} завдань · ${EXAM_MINUTES} хвилин на варіант`;
+  home();
+}
+boot();
+</script>
+</body>
+</html>
