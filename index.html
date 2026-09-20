@@ -151,6 +151,11 @@ table.hist td.kind { color: var(--muted); font-size: 12px; text-transform: upper
 .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 .pill.ok { background: var(--ok-soft); color: var(--ok); }
+.item.link { width: 100%; text-align: left; background: var(--card); color: inherit; font: inherit; cursor: pointer; }
+.item.link:hover { border-color: var(--accent); }
+.answers2 { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; flex-shrink: 0; max-width: 55%; }
+.answers2 .pill { white-space: normal; text-align: right; }
+@media (max-width: 700px) { .item.link { flex-direction: column; align-items: flex-start; } .answers2 { align-items: flex-start; max-width: 100%; } .answers2 .pill { text-align: left; } }
 footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 16px; }
 </style>
 </head>
@@ -567,7 +572,7 @@ function runDrill(pool, title, isErrors) {
         cur.selected = l; cur.revealed = true;
         const good = l === item.correct;
         good ? ok++ : bad++;
-        results.push({ item, variantId, good });
+        results.push({ item, variantId, good, selected: l, order: cur.order });
         recordAnswer(item, variantId, good);
         render();
         nextBtn.focus();
@@ -588,19 +593,59 @@ function runDrill(pool, title, isErrors) {
   function finishDrill() {
     document.onkeydown = null;
     const fixed = results.filter(r => r.good).length;
+    const wrong = results.filter(r => !r.good).sort((a, b) => a.variantId - b.variantId || a.item.n - b.item.n);
+    const oneVariant = new Set(results.map(r => r.variantId)).size === 1;
+    // Per-section score of this session.
+    const bySection = Object.keys(DATA.sections).map(sec => {
+      const rs = results.filter(r => r.item.section === sec);
+      return rs.length ? { sec, ok: rs.filter(r => r.good).length, total: rs.length } : null;
+    }).filter(Boolean);
+    const text = html => html.replace(/<[^>]+>/g, '');
+    const answerText = (item, letter) => letter ? text(item.answers.find(a => a.letter === letter).html) : '—';
     show(el('div', {},
       el('div', { class: 'card' },
         el('h2', { style: 'margin-top:0' }, title + ' завершено'),
         el('div', { class: 'score' },
           el('div', {}, el('div', { class: 'big' }, `${ok}/${ok + bad}`), el('div', { class: 'muted small' }, 'правильних відповідей у цій сесії')),
           isErrors ? el('div', { class: 'muted' }, `Виправлено: ${fixed}. Залишилось у списку: ${Object.keys(store.errors).length}.`) : null),
-        results.filter(r => !r.good).length ? el('div', { class: 'list' },
-          ...results.filter(r => !r.good).map(r => el('div', { class: 'item' },
-            el('span', {}, el('b', {}, `${shortTitle(variantById(r.variantId))}, завдання ${r.item.n}`), ' ', el('span', { class: 'muted' }, DATA.sections[r.item.section])),
-            el('span', { class: 'pill bad' }, 'правильно: «' + r.item.answers.find(a => a.letter === r.item.correct).html.replace(/<[^>]+>/g, '') + '»')))) : null),
+        bySection.length > 1 ? el('div', { class: 'bars' }, ...bySection.map(b => el('div', { class: 'bar' },
+          el('span', {}, DATA.sections[b.sec]), el('b', {}, `${b.ok}/${b.total}`),
+          el('div', { class: 'track' }, el('div', { class: 'fill', style: `width:${Math.round(100 * b.ok / b.total)}%` }))))) : null,
+        wrong.length ? el('div', {},
+          el('h3', { style: 'margin:18px 0 6px' }, `Помилки (${wrong.length}). Натисни на завдання, щоб перечитати розбір.`),
+          oneVariant ? el('div', { class: 'muted small' }, shortTitle(variantById(wrong[0].variantId))) : null,
+          el('div', { class: 'list' },
+            ...wrong.map((r, i) => el('button', { class: 'item link', onclick: () => reviewResults(wrong, i) },
+              el('span', {}, el('b', {}, (oneVariant ? '' : shortTitle(variantById(r.variantId)) + ', ') + `завдання ${r.item.n}`), ' ', el('span', { class: 'muted' }, DATA.sections[r.item.section])),
+              el('span', { class: 'answers2' },
+                el('span', { class: 'pill bad' }, 'твоя: «' + answerText(r.item, r.selected) + '»'),
+                el('span', { class: 'pill ok' }, 'правильно: «' + answerText(r.item, r.item.correct) + '»')))))) : el('p', { class: 'muted' }, 'Без помилок.')),
       el('div', { class: 'row', style: 'margin-top:14px' },
         Object.keys(store.errors).length ? el('button', { class: 'btn primary', onclick: startErrors }, 'Повторити помилки') : null,
+        el('button', { class: 'btn', onclick: () => runDrill(shuffleGrouped(pool), title, isErrors) }, 'Пройти ще раз'),
         el('button', { class: 'btn', onclick: home }, 'На головну'))));
+  }
+  // Walk through answered items of this session with the given answer and the review open.
+  function reviewResults(list, start) {
+    let i = start;
+    const body = el('div', {});
+    const counter = el('b', {});
+    const root = el('div', {},
+      el('div', { class: 'qbar' }, counter, el('span', { class: 'spacer' }), el('button', { class: 'btn small', onclick: finishDrill }, 'До підсумку')),
+      body,
+      el('div', { class: 'qactions' },
+        el('button', { class: 'btn', onclick: () => go(i - 1) }, '← Назад'),
+        el('button', { class: 'btn primary', onclick: () => i + 1 < list.length ? go(i + 1) : finishDrill() }, 'Далі →')));
+    show(root);
+    function go(k) {
+      i = Math.max(0, Math.min(list.length - 1, k));
+      const r = list[i];
+      counter.textContent = `Розбір помилки ${i + 1} / ${list.length}`;
+      body.replaceChildren(renderItem(r.item, r.variantId, { order: r.order, selected: r.selected, revealed: true, showExplanation: true }));
+      window.scrollTo({ top: 0 });
+    }
+    document.onkeydown = e => { if (e.key === 'ArrowRight' || e.key === 'Enter') { if (i + 1 < list.length) go(i + 1); else finishDrill(); } else if (e.key === 'ArrowLeft') go(i - 1); };
+    go(i);
   }
   document.onkeydown = e => {
     if (['1', '2', '3', '4'].includes(e.key) && cur && !cur.revealed) { const btn = body.querySelectorAll('.ans')[+e.key - 1]; if (btn) btn.click(); }
