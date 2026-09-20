@@ -287,6 +287,7 @@ function stopTimer() { if (timerHandle) { clearInterval(timerHandle); timerHandl
 function show(node) { stopTimer(); app.replaceChildren(node); window.scrollTo({ top: 0 }); }
 
 function home() {
+  if (window.TZNK_SYNC) window.TZNK_SYNC.pullSoon(10000); // fresh cloud state when returning to the start page
   const attempts = store.attempts.slice().reverse();
   const errCount = Object.keys(store.errors).length;
   const drilled = Object.values(store.drill);

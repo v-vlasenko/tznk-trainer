@@ -120,7 +120,17 @@ async function pull() {
   } catch (e) { setStatus('немає доступу до хмари', e); }
   finally { pulling = false; }
 }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { pull(); schedulePush(); } });
+// Re-read the cloud copy whenever the person comes back to the page, and once a
+// minute while it stays open, so a second device sees changes without a reload.
+let lastPull = 0;
+function pullSoon(minGapMs) {
+  if (Date.now() - lastPull < minGapMs) return;
+  lastPull = Date.now();
+  pull(); schedulePush();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pullSoon(3000); });
+window.addEventListener('focus', () => pullSoon(3000));
+setInterval(() => { if (document.visibilityState === 'visible') pullSoon(55000); }, 60000);
 
 // ---------- UI ----------
 function setStatus(text, err) {
@@ -211,5 +221,5 @@ onAuthStateChanged(auth, u => {
 });
 
 // index.html calls schedulePush after every local change and reads the rest for the home page.
-window.TZNK_SYNC = { schedulePush, mergeStores, signIn, isSignedIn: () => !!user, isReady: () => ready };
+window.TZNK_SYNC = { schedulePush, mergeStores, signIn, isSignedIn: () => !!user, isReady: () => ready, pullSoon };
 }
