@@ -510,7 +510,8 @@ function startSim(variantId, saved) {
       if (ok) attempt.score++;
       recordAnswer(it, v.id, ok);
     }
-    store.attempts.push(attempt); setInProgress(null); saveStore();
+    store.attempts.push(attempt); if (store.attempts.length > 300) store.attempts = store.attempts.slice(-300);
+    setInProgress(null); saveStore();
     showResult(attempt);
   }
   timerHandle = setInterval(() => {

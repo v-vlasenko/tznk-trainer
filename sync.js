@@ -80,7 +80,6 @@ async function pushNow() {
   const store = APP.getStore();
   const fp = fingerprint(store);
   if (fp === lastPushed) { setStatus(''); return; }
-  lastPushed = fp;
   const data = {};
   for (const f of FIELDS) data[f] = store[f] ?? null;
   // Firestore rejects undefined anywhere in the document; JSON round-trip drops such keys.
@@ -90,6 +89,7 @@ async function pushNow() {
     name: user.displayName || '', email: user.email || '', photo: user.photoURL || '',
     updatedAt: serverTimestamp(), device: navigator.userAgent.slice(0, 80),
   });
+  lastPushed = fp; // only after the write succeeded, so a failed push is retried
   setStatus('');
 }
 
@@ -120,7 +120,7 @@ async function pull() {
   } catch (e) { setStatus('немає доступу до хмари', e); }
   finally { pulling = false; }
 }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pull(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { pull(); schedulePush(); } });
 
 // ---------- UI ----------
 function setStatus(text, err) {
@@ -145,7 +145,6 @@ function renderSlot() {
       el('span', { class: 'who' }, user.displayName || '', el('br'), user.email || ''),
       isAdmin() ? el('button', { class: 'btn small', onclick: showAll }, 'Прогрес усіх') : null,
       el('button', { class: 'btn small', onclick: leave }, 'Вийти')));
-  document.addEventListener('click', () => menu.classList.remove('open'));
   slot.replaceChildren(menu);
 }
 
@@ -201,6 +200,7 @@ async function showAll() {
   window.scrollTo({ top: 0 });
 }
 
+document.addEventListener('click', () => { const m = slot.querySelector('.menu.open'); if (m) m.classList.remove('open'); });
 let ready = false;
 onAuthStateChanged(auth, u => {
   user = u;
