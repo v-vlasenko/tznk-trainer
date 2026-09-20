@@ -316,6 +316,7 @@ function home() {
         el('div', { class: 'row' },
           el('button', { class: 'btn primary', disabled: errCount ? null : '', onclick: startErrors }, 'Повторити помилки'),
           errCount ? el('button', { class: 'btn small danger', onclick: () => { if (confirm('Очистити список помилок?')) { store.errors = {}; saveStore(); home(); } } }, 'Очистити') : null))),
+    signInOffer(),
     el('h2', { class: 'sec' }, 'Варіанти'),
     el('div', { class: 'card' }, variantTable()),
     attempts.length ? el('h2', { class: 'sec' }, 'Історія симуляцій') : null,
@@ -349,6 +350,19 @@ function variantTable() {
       el('td', { class: 'hide-sm' }, att.length), el('td', {}, best === null ? '—' : `${best}/${MAX_POINTS}`), el('td', {}, `${solved}/${v.items.length}`), el('td', {}, errs || '—')));
   }
   return el('div', { class: 'tablewrap' }, t);
+}
+// Offer to sign in until the person does it or dismisses the card.
+function signInOffer() {
+  const sync = window.TZNK_SYNC;
+  if (!sync || !sync.isReady() || sync.isSignedIn()) return null;
+  let hidden = false; try { hidden = localStorage.getItem('tznk.nosignin') === '1'; } catch (e) { /* private mode */ }
+  if (hidden) return null;
+  return el('div', { class: 'card', style: 'margin-bottom:14px' },
+    el('h2', { style: 'margin-top:0' }, 'Зберігати прогрес'),
+    el('p', {}, 'Зараз прогрес живе лише в цьому браузері й зникне, якщо очистити дані. Після входу через Google він зберігається в хмарі й синхронізується між телефоном і ноутбуком.'),
+    el('div', { class: 'row' },
+      el('button', { class: 'btn primary', onclick: sync.signIn }, 'Увійти через Google'),
+      el('button', { class: 'btn small', onclick: () => { try { localStorage.setItem('tznk.nosignin', '1'); } catch (e) { /* private mode */ } home(); } }, 'Не зараз')));
 }
 function sessionsTable(sessions) {
   const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Дата'), el('th', {}, 'Режим'), el('th', {}, 'Результат'), el('th', { class: 'hide-sm' }, 'По блоках')));

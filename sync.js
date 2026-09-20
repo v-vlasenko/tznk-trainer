@@ -157,14 +157,17 @@ async function showAll() {
   window.scrollTo({ top: 0 });
 }
 
+let ready = false;
 onAuthStateChanged(auth, u => {
   user = u;
+  ready = true;
   lastPushed = '';
   if (unsubscribe) { unsubscribe(); unsubscribe = null; }
   renderSlot();
   if (user) listen();
+  if (APP.isHome()) APP.rerenderHome(); // show or hide the sign-in offer
 });
 
-// index.html calls this after every local change.
-window.TZNK_SYNC = { schedulePush, mergeStores };
+// index.html calls schedulePush after every local change and reads the rest for the home page.
+window.TZNK_SYNC = { schedulePush, mergeStores, signIn, isSignedIn: () => !!user, isReady: () => ready };
 }
