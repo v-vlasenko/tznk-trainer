@@ -8,7 +8,7 @@ if (cfg && APP) main().catch(e => console.warn('sync: disabled', e));
 async function main() {
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
 const [{ initializeApp }, { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut },
-  { getFirestore, doc, collection, getDocs, setDoc, onSnapshot, serverTimestamp }] = await Promise.all([
+  { getFirestore, doc, collection, getDoc, getDocs, setDoc, serverTimestamp }] = await Promise.all([
   import(SDK + 'firebase-app.js'), import(SDK + 'firebase-auth.js'), import(SDK + 'firebase-firestore.js')]);
 
 const fb = initializeApp(cfg.firebase);
@@ -18,7 +18,6 @@ const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
 
 let user = null;
-let unsubscribe = null;
 let pushTimer = null;
 let lastPushed = '';
 const slot = document.getElementById('account');
@@ -65,8 +64,12 @@ function mergeStores(a, b) {
 const emptyLike = () => ({ attempts: [], errors: {}, drill: {}, sessions: [], inProgress: null, inProgressAt: null, errorsClearedAt: null, resetAt: null, savedAt: null });
 
 const FIELDS = ['attempts', 'errors', 'drill', 'sessions', 'inProgress', 'inProgressAt', 'errorsClearedAt', 'resetAt', 'savedAt'];
+// Key order differs between the local object and what Firestore returns, so compare with sorted keys.
+const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
+  : v && typeof v === 'object' ? '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}'
+  : JSON.stringify(v ?? null);
 function fingerprint(store) {
-  return JSON.stringify(FIELDS.map(f => store[f] ?? null));
+  return stable(FIELDS.map(f => store[f] ?? null));
 }
 
 // ---------- cloud ----------
@@ -97,21 +100,28 @@ function schedulePush() {
   pushTimer = setTimeout(() => pushNow().catch(e => setStatus('помилка синхронізації', e)), 1500);
 }
 
-function listen() {
-  if (unsubscribe) unsubscribe();
-  unsubscribe = onSnapshot(userDoc(), snap => {
-    if (snap.metadata.hasPendingWrites) return; // our own write echoing back
+// Pull the cloud copy, merge it into the local store and upload the union.
+// Called on sign-in and whenever the tab becomes visible again: one read per
+// visit instead of a permanent realtime channel.
+let pulling = false;
+async function pull() {
+  if (!user || pulling) return;
+  pulling = true;
+  try {
+    const snap = await getDoc(userDoc());
     const remote = snap.exists() ? snap.data() : null;
     const local = APP.getStore();
     const merged = remote ? mergeStores(local, remote) : local;
     const fp = fingerprint(merged);
     const changed = fp !== fingerprint(local);
     if (changed) APP.setStore(merged);
-    if (fp !== lastPushed) schedulePush(); // upload the union so both sides converge
-    else setStatus('');
+    if (remote && fp === fingerprint(remote)) lastPushed = fp; else schedulePush();
+    if (!remote || fp === fingerprint(remote)) setStatus('');
     if (changed && APP.isHome()) APP.rerenderHome();
-  }, e => setStatus('немає доступу до хмари', e));
+  } catch (e) { setStatus('немає доступу до хмари', e); }
+  finally { pulling = false; }
 }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pull(); });
 
 // ---------- UI ----------
 function setStatus(text, err) {
@@ -154,7 +164,6 @@ async function leave() {
   if (!confirm('Вийти? Прогрес збережено в хмарі, на цьому пристрої він буде очищений.')) return;
   clearTimeout(pushTimer);
   try { await pushNow(); } catch (e) { if (!confirm('Не вдалося дозаписати прогрес у хмару. Все одно вийти?')) return; }
-  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
   await signOut(auth);
   APP.setStore({});
   APP.rerenderHome();
@@ -198,9 +207,8 @@ onAuthStateChanged(auth, u => {
   user = u;
   ready = true;
   lastPushed = '';
-  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
   renderSlot();
-  if (user) listen();
+  if (user) pull();
   if (APP.isHome()) APP.rerenderHome(); // show or hide the sign-in offer
 });
 
