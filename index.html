@@ -430,12 +430,12 @@ function startSim(variantId, saved) {
   function renderNav() {
     nav.replaceChildren(...v.items.map((it, i) => el('button', { class: (i === idx ? 'cur ' : '') + (state.answers[it.n] ? 'done' : ''), onclick: () => go(i) }, it.n)));
   }
-  function go(i) {
+  function go(i, keepScroll) {
     idx = Math.max(0, Math.min(v.items.length - 1, i));
     const it = v.items[idx];
-    body.replaceChildren(renderItem(it, v.id, { selected: state.answers[it.n], onSelect: l => { state.answers[it.n] = l; persist(); go(idx); } }));
+    body.replaceChildren(renderItem(it, v.id, { selected: state.answers[it.n], onSelect: l => { state.answers[it.n] = l; persist(); go(idx, true); } }));
     renderNav(); persist();
-    window.scrollTo({ top: 0 });
+    if (!keepScroll) window.scrollTo({ top: 0 });
   }
   function finish() {
     stopTimer();
@@ -584,7 +584,7 @@ function runDrill(pool, title, isErrors) {
         results.push({ item, variantId, good, selected: l, order: cur.order });
         recordAnswer(item, variantId, good);
         render();
-        nextBtn.focus();
+        nextBtn.focus({ preventScroll: true });
       }
     }));
     nextBtn.disabled = !cur.revealed;
