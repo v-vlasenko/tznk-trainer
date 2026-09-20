@@ -46,6 +46,17 @@ header.top {
   padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--card);
   position: sticky; top: 0; z-index: 5;
 }
+/* Phones: one compact row that scrolls away with the page. */
+@media (max-width: 600px) {
+  header.top { position: static; padding: 10px 16px; }
+  header.top .sub { display: none; }
+  header.top h1 { font-size: 16px; }
+  header.top .row { flex-wrap: nowrap; gap: 6px; }
+}
+.menu { position: relative; }
+.menu .drop { position: absolute; right: 0; top: 34px; display: none; flex-direction: column; gap: 6px; padding: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); z-index: 6; min-width: 160px; }
+.menu.open .drop { display: flex; }
+.menu .who { padding: 4px 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 header.top h1 { font-size: 18px; margin: 0; font-weight: 650; }
 header.top .sub { color: var(--muted); font-size: 13px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
@@ -170,7 +181,7 @@ table.hist td.kind { color: var(--muted); font-size: 12px; text-transform: upper
 footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 16px; }
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
 .modal { max-width: 440px; width: 100%; }
-.acct { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.acct { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 3px 8px; }
 .acct img { width: 24px; height: 24px; border-radius: 50%; }
 @media (max-width: 600px) { .acct .name { display: none; } }
 </style>

@@ -106,13 +106,19 @@ function renderSlot() {
     slot.replaceChildren(el('button', { class: 'btn small', onclick: signIn }, 'Увійти через Google'));
     return;
   }
-  slot.replaceChildren(
-    el('span', { class: 'acct', title: user.email || '' },
-      user.photoURL ? el('img', { src: user.photoURL, alt: '', referrerpolicy: 'no-referrer' }) : null,
-      el('span', { class: 'name' }, user.displayName || user.email || 'Акаунт'),
-      el('span', { class: 'sync-status muted small' }, '')),
-    isAdmin() ? el('button', { class: 'btn small', onclick: showAll }, 'Прогрес усіх') : null,
-    el('button', { class: 'btn small', onclick: () => signOut(auth) }, 'Вийти'));
+  // Avatar button with a dropdown: keeps the header one row on phones.
+  const menu = el('span', { class: 'menu' });
+  const avatar = user.photoURL ? el('img', { src: user.photoURL, alt: '', referrerpolicy: 'no-referrer' })
+    : el('span', { class: 'name' }, (user.displayName || user.email || '?')[0]);
+  menu.append(
+    el('button', { class: 'btn small acct', title: user.email || '', onclick: e => { e.stopPropagation(); menu.classList.toggle('open'); } },
+      avatar, el('span', { class: 'sync-status muted small' }, '')),
+    el('span', { class: 'drop' },
+      el('span', { class: 'who' }, user.displayName || '', el('br'), user.email || ''),
+      isAdmin() ? el('button', { class: 'btn small', onclick: showAll }, 'Прогрес усіх') : null,
+      el('button', { class: 'btn small', onclick: () => signOut(auth) }, 'Вийти')));
+  document.addEventListener('click', () => menu.classList.remove('open'));
+  slot.replaceChildren(menu);
 }
 
 async function signIn() {
