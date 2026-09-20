@@ -545,17 +545,20 @@ function runDrill(pool, title, isErrors) {
   const scoreEl = el('span', { class: 'muted' });
   const body = el('div', {});
   const nextBtn = el('button', { class: 'btn primary', onclick: next }, 'Далі →');
+  const backBtn = el('button', { class: 'btn', onclick: back }, '← Назад');
   const root = el('div', {},
     el('div', { class: 'qbar' }, counter, scoreEl, el('span', { class: 'spacer' }), el('button', { class: 'btn small', onclick: () => finishDrill() }, 'Завершити')),
     body,
-    el('div', { class: 'qactions' }, el('span', {}), nextBtn));
+    el('div', { class: 'qactions' }, backBtn, nextBtn));
   show(root);
+  // One state per position, so going back shows the answer as it was given.
+  const states = [];
   let cur = null;
   function render() {
     const { item, variantId } = pool[idx];
     counter.textContent = `${title} · ${idx + 1} / ${pool.length}`;
     scoreEl.textContent = `правильно ${ok} · помилок ${bad}`;
-    if (!cur || cur.item !== item) cur = { item, variantId, order: shuffle(item.answers.map(a => a.letter)), selected: null, revealed: false };
+    cur = states[idx] || (states[idx] = { order: shuffle(item.answers.map(a => a.letter)), selected: null, revealed: false });
     body.replaceChildren(renderItem(item, variantId, {
       order: cur.order, selected: cur.selected, revealed: cur.revealed,
       showExplanation: cur.revealed && cur.selected !== item.correct,
@@ -571,11 +574,16 @@ function runDrill(pool, title, isErrors) {
       }
     }));
     nextBtn.disabled = !cur.revealed;
+    backBtn.disabled = idx === 0;
   }
   function next() {
     if (!cur.revealed) return;
     if (idx + 1 >= pool.length) { finishDrill(); return; }
     idx++; render(); window.scrollTo({ top: 0 });
+  }
+  function back() {
+    if (idx === 0) return;
+    idx--; render(); window.scrollTo({ top: 0 });
   }
   function finishDrill() {
     document.onkeydown = null;
@@ -589,7 +597,7 @@ function runDrill(pool, title, isErrors) {
         results.filter(r => !r.good).length ? el('div', { class: 'list' },
           ...results.filter(r => !r.good).map(r => el('div', { class: 'item' },
             el('span', {}, el('b', {}, `${shortTitle(variantById(r.variantId))}, завдання ${r.item.n}`), ' ', el('span', { class: 'muted' }, DATA.sections[r.item.section])),
-            el('span', { class: 'pill bad' }, `правильно: ${r.item.correct}`)))) : null),
+            el('span', { class: 'pill bad' }, 'правильно: «' + r.item.answers.find(a => a.letter === r.item.correct).html.replace(/<[^>]+>/g, '') + '»')))) : null),
       el('div', { class: 'row', style: 'margin-top:14px' },
         Object.keys(store.errors).length ? el('button', { class: 'btn primary', onclick: startErrors }, 'Повторити помилки') : null,
         el('button', { class: 'btn', onclick: home }, 'На головну'))));
@@ -597,6 +605,7 @@ function runDrill(pool, title, isErrors) {
   document.onkeydown = e => {
     if (['1', '2', '3', '4'].includes(e.key) && cur && !cur.revealed) { const btn = body.querySelectorAll('.ans')[+e.key - 1]; if (btn) btn.click(); }
     else if (e.key === 'ArrowRight' || e.key === 'Enter') { if (document.activeElement && document.activeElement.classList.contains('ans')) return; next(); }
+    else if (e.key === 'ArrowLeft') back();
   };
   render();
 }
