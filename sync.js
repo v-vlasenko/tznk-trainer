@@ -79,7 +79,7 @@ async function pushNow() {
   if (!user) return;
   const store = APP.getStore();
   const fp = fingerprint(store);
-  if (fp === lastPushed) return;
+  if (fp === lastPushed) { setStatus(''); return; }
   lastPushed = fp;
   const data = {};
   for (const f of FIELDS) data[f] = store[f] ?? null;
@@ -95,7 +95,6 @@ async function pushNow() {
 
 function schedulePush() {
   if (!user) return;
-  setStatus('…');
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => pushNow().catch(e => setStatus('помилка синхронізації', e)), 1500);
 }
