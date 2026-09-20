@@ -343,8 +343,10 @@ function home() {
     (store.sessions || []).length ? el('div', { class: 'card' }, sessionsTable(store.sessions.slice(-15).reverse())) : null,
     el('h2', { class: 'sec' }, 'Дані'),
     el('div', { class: 'card row small' },
-      el('button', { class: 'btn small', onclick: exportProgress }, 'Експорт прогресу'),
-      el('label', { class: 'btn small' }, 'Імпорт прогресу', el('input', { type: 'file', accept: 'application/json', class: 'hidden', onchange: importProgress })),
+      // Without sign-in a JSON file is the only way to move or keep progress.
+      ...(window.TZNK_SYNC && window.TZNK_SYNC.isSignedIn() ? [] : [
+        el('button', { class: 'btn small', onclick: exportProgress }, 'Експорт прогресу'),
+        el('label', { class: 'btn small' }, 'Імпорт прогресу', el('input', { type: 'file', accept: 'application/json', class: 'hidden', onchange: importProgress }))]),
       el('button', { class: 'btn small danger', onclick: () => { if (confirm(window.TZNK_SYNC && window.TZNK_SYNC.isSignedIn() ? 'Видалити весь прогрес, разом із хмарною копією?' : 'Видалити весь прогрес у цьому браузері?')) { store = emptyStore(); store.resetAt = new Date().toISOString(); saveStore(); home(); } } }, 'Скинути все'),
       el('span', { class: 'muted' }, `Дані оновлено ${DATA.generated}.`)));
   show(node);
