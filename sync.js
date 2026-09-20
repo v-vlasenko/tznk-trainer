@@ -159,7 +159,6 @@ async function signIn() {
 
 // Sign out: upload what is pending, then clear this device so the next person starts clean.
 async function leave() {
-  if (!confirm('Вийти? Прогрес збережено в хмарі, на цьому пристрої він буде очищений.')) return;
   clearTimeout(pushTimer);
   try { await pushNow(); } catch (e) { if (!confirm('Не вдалося дозаписати прогрес у хмару. Все одно вийти?')) return; }
   await signOut(auth);
