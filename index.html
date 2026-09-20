@@ -166,6 +166,8 @@ table.hist td.kind { color: var(--muted); font-size: 12px; text-transform: upper
 .answers2 .pill { white-space: normal; text-align: right; }
 @media (max-width: 700px) { .item.link { flex-direction: column; align-items: flex-start; } .answers2 { align-items: flex-start; max-width: 100%; } .answers2 .pill { text-align: left; } }
 footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 16px; }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+.modal { max-width: 440px; width: 100%; }
 .acct { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .acct img { width: 24px; height: 24px; border-radius: 50%; }
 @media (max-width: 600px) { .acct .name { display: none; } }
@@ -351,18 +353,24 @@ function variantTable() {
   }
   return el('div', { class: 'tablewrap' }, t);
 }
-// Offer to sign in until the person does it or dismisses the card.
+// Modal offer to sign in, shown once per browser until the person signs in or dismisses it.
+let signInOfferShown = false;
 function signInOffer() {
   const sync = window.TZNK_SYNC;
-  if (!sync || !sync.isReady() || sync.isSignedIn()) return null;
+  if (!sync || !sync.isReady() || sync.isSignedIn() || signInOfferShown) return null;
   let hidden = false; try { hidden = localStorage.getItem('tznk.nosignin') === '1'; } catch (e) { /* private mode */ }
   if (hidden) return null;
-  return el('div', { class: 'card', style: 'margin-bottom:14px' },
-    el('h2', { style: 'margin-top:0' }, 'Зберігати прогрес'),
-    el('p', {}, 'Зараз прогрес живе лише в цьому браузері й зникне, якщо очистити дані. Після входу через Google він зберігається в хмарі й синхронізується між телефоном і ноутбуком.'),
-    el('div', { class: 'row' },
-      el('button', { class: 'btn primary', onclick: sync.signIn }, 'Увійти через Google'),
-      el('button', { class: 'btn small', onclick: () => { try { localStorage.setItem('tznk.nosignin', '1'); } catch (e) { /* private mode */ } home(); } }, 'Не зараз')));
+  signInOfferShown = true;
+  const close = () => overlay.remove();
+  const overlay = el('div', { class: 'overlay', onclick: e => { if (e.target === overlay) close(); } },
+    el('div', { class: 'modal card' },
+      el('h2', { style: 'margin-top:0' }, 'Зберігати прогрес?'),
+      el('p', {}, 'Зараз прогрес живе лише в цьому браузері й зникне, якщо очистити дані. Після входу через Google він зберігається в хмарі й синхронізується між телефоном і ноутбуком.'),
+      el('div', { class: 'row' },
+        el('button', { class: 'btn primary', onclick: () => { close(); sync.signIn(); } }, 'Увійти через Google'),
+        el('button', { class: 'btn', onclick: () => { try { localStorage.setItem('tznk.nosignin', '1'); } catch (e) { /* private mode */ } close(); } }, 'Не зараз'))));
+  document.body.append(overlay);
+  return null;
 }
 function sessionsTable(sessions) {
   const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Дата'), el('th', {}, 'Режим'), el('th', {}, 'Результат'), el('th', { class: 'hide-sm' }, 'По блоках')));
