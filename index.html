@@ -76,6 +76,11 @@ h2.sec { font-size: 16px; margin: 22px 0 10px; color: var(--muted); font-weight:
 table.hist { width: 100%; font-size: 14px; }
 table.hist td, table.hist th { border: 0; border-bottom: 1px solid var(--line); text-align: left; padding: 8px 6px; }
 table.hist th { color: var(--muted); font-weight: 600; }
+table.hist td.kind { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding-top: 14px; }
+.expl.review { background: var(--accent-soft); }
+.expl details { margin-top: 10px; }
+.expl summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.expl .src { margin-top: 8px; }
 
 /* quiz */
 .qbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -126,7 +131,8 @@ table.hist th { color: var(--muted); font-weight: 600; }
 .expl { margin-top: 14px; padding: 14px 16px; border-radius: 10px; background: var(--warn-soft); border: 1px solid transparent; font-size: 15px; }
 .expl p { margin: .5em 0; }
 .expl .t { font-weight: 700; margin-bottom: 4px; }
-.expl .legend { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.expl .legend { margin: 8px 0; font-size: 13px; color: var(--muted); }
+.expl .legend ul { margin: 4px 0 0; padding-left: 18px; }
 .verdict { font-weight: 700; margin-top: 12px; }
 .verdict.ok { color: var(--ok); } .verdict.bad { color: var(--bad); }
 .qactions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; justify-content: space-between; }
@@ -241,9 +247,10 @@ function home() {
   const acc = okSum + badSum ? Math.round(100 * okSum / (okSum + badSum)) : null;
   const best = attempts.length ? Math.max(...attempts.map(a => a.score)) : null;
 
-  const variantOpts = DATA.variants.map(v => el('option', { value: v.id }, shortTitle(v)));
-  const simSel = el('select', {}, ...variantOpts.map(o => o.cloneNode(true)));
-  const drillSel = el('select', {}, el('option', { value: 'all' }, 'Усі варіанти'), ...variantOpts.map(o => o.cloneNode(true)));
+  const simSel = el('select', {}, ...variantOptions());
+  const drillSel = el('select', {}, el('option', { value: 'all' }, 'Усі варіанти'),
+    ...Object.entries(DATA.kinds).filter(([k]) => DATA.variants.some(v => v.kind === k)).map(([k, t]) => el('option', { value: 'kind:' + k }, 'Усі: ' + t)),
+    ...variantOptions());
   const secSel = el('select', {}, el('option', { value: 'all' }, 'Усі блоки'),
     ...Object.entries(DATA.sections).map(([k, t]) => el('option', { value: k }, t)));
   const onlyNew = el('input', { type: 'checkbox', checked: '' });
@@ -292,10 +299,17 @@ function home() {
       el('span', { class: 'muted' }, `Дані оновлено ${DATA.generated}.`)));
   show(node);
 }
-function shortTitle(v) { return v.title.replace(/^Тренувальний ТЗНК в магістратуру\.\s*/, ''); }
+function shortTitle(v) { return v.title; }
+function variantOptions() {
+  const groups = {};
+  for (const v of DATA.variants) (groups[v.kind] ||= []).push(v);
+  return Object.entries(groups).map(([k, vs]) => el('optgroup', { label: DATA.kinds[k] || k }, ...vs.map(v => el('option', { value: v.id }, v.title))));
+}
 function variantTable() {
   const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Варіант'), el('th', {}, 'Симуляцій'), el('th', {}, 'Найкращий'), el('th', {}, 'Розв’язано в тренажері'), el('th', {}, 'Помилок')));
+  let lastKind = null;
   for (const v of DATA.variants) {
+    if (v.kind !== lastKind) { t.append(el('tr', {}, el('td', { colspan: 5, class: 'kind' }, DATA.kinds[v.kind] || v.kind))); lastKind = v.kind; }
     const att = store.attempts.filter(a => a.variantId === v.id);
     const best = att.length ? Math.max(...att.map(a => a.score)) : null;
     const solved = v.items.filter(it => (store.drill[keyOf(v.id, it.n)] || {}).ok > 0).length;
@@ -353,15 +367,21 @@ function renderItem(item, variantId, opts) {
     const correctText = byLetter[item.correct].html.replace(/<[^>]+>/g, '');
     body.append(el('div', { class: 'verdict ' + (ok ? 'ok' : 'bad') },
       ok ? 'Правильно' : `${opts.selected ? 'Неправильно' : 'Без відповіді'}. Правильна відповідь: ${shownCorrect} — «${correctText}»`));
-    if (item.explanation) {
-      const expl = el('div', { class: 'expl' + (opts.showExplanation ? '' : ' hidden') },
-        el('div', { class: 't' }, 'Пояснення'),
-        shuffled ? el('div', { class: 'legend' }, 'Варіанти тут перемішані. У поясненні літери за оригіналом: ',
-          item.answers.map(a => `${a.letter} → тут ${letters[order.indexOf(a.letter)]}`).join(', '), '.') : null,
-        el('div', { html: item.explanation }));
+    // The official text refers to options by their original letters; when answers
+    // are shuffled, list the original lettering so the text reads without decoding.
+    const legend = shuffled ? el('div', { class: 'legend' }, 'Літери в цьому тексті — за оригінальним порядком: ',
+      el('ul', {}, ...item.answers.map(a => el('li', {}, `${a.letter} — «${a.html.replace(/<[^>]+>/g, '')}»`)))) : null;
+    const sources = [];
+    if (item.official) sources.push(el('details', {}, el('summary', {}, 'Обґрунтування УЦОЯО (офіційне)'), legend, el('div', { class: 'src', html: item.official })));
+    if (!item.review && item.explanation) sources.push(el('details', { open: '' }, el('summary', {}, 'Пояснення ЗНО-онлайн'), legend, el('div', { class: 'src', html: item.explanation })));
+    if (item.review || sources.length) {
+      const expl = el('div', { class: 'expl' + (item.review ? ' review' : '') + (opts.showExplanation ? '' : ' hidden') },
+        el('div', { class: 't' }, item.review ? 'Розбір' : 'Пояснення'),
+        item.review ? el('div', { html: item.review }) : null,
+        ...sources);
       body.append(expl);
       if (!opts.showExplanation) {
-        const b = el('button', { class: 'btn small', style: 'margin-top:10px', onclick: () => { expl.classList.remove('hidden'); b.remove(); } }, 'Показати пояснення');
+        const b = el('button', { class: 'btn small', style: 'margin-top:10px', onclick: () => { expl.classList.remove('hidden'); b.remove(); } }, item.review ? 'Показати розбір' : 'Показати пояснення');
         body.append(b);
       }
     }
@@ -490,7 +510,9 @@ function review(items, variantId, attempt, startIdx = 0) {
 
 // ---------- drill / errors ----------
 function startDrill(variantSel, section, onlyNew) {
-  let pool = variantSel === 'all' ? allItems() : variantById(variantSel).items.map(item => ({ item, variantId: Number(variantSel) }));
+  let pool = variantSel === 'all' ? allItems()
+    : variantSel.startsWith('kind:') ? allItems().filter(p => variantById(p.variantId).kind === variantSel.slice(5))
+    : variantById(variantSel).items.map(item => ({ item, variantId: Number(variantSel) }));
   if (section !== 'all') pool = pool.filter(p => p.item.section === section);
   if (onlyNew) pool = pool.filter(p => !(store.drill[keyOf(p.variantId, p.item.n)] || {}).ok);
   if (!pool.length) { alert('Немає завдань за цим фільтром. Зніми галочку «лише ще не розв’язані».'); return; }

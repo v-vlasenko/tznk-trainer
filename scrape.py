@@ -2,8 +2,9 @@
 """Scrape ТЗНК training variants from zno.osvita.ua into data.js.
 
 Usage:
-    .venv/bin/python scrape.py            # default variants 646-650
-    .venv/bin/python scrape.py 646 647    # explicit variant ids
+    .venv/bin/python scrape.py                     # default variants 646-650
+    .venv/bin/python scrape.py 646 647             # explicit variant ids
+    .venv/bin/python scrape.py 629 --out x.js      # write elsewhere
 
 Each variant page contains all 33 items as <form class="q-test">. The correct
 answer is the hidden <input name="result">, the explanation is the
@@ -27,7 +28,21 @@ OUT = ROOT / "data.js"
 JS_PREFIX = "window.TZNK_DATA = "
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/128 Safari/537.36")
-DEFAULT_VARIANTS = [646, 647, 648, 649, 650]
+DEFAULT_VARIANTS = [646, 647, 648, 649, 650, 629, 566, 534]
+# Human titles and source kind. 508 (demo 2022) is identical to 534 and skipped.
+META = {
+    646: ("Тренувальний варіант 1", "training"),
+    647: ("Тренувальний варіант 2", "training"),
+    648: ("Тренувальний варіант 3", "training"),
+    649: ("Тренувальний варіант 4", "training"),
+    650: ("Тренувальний варіант 5", "training"),
+    629: ("Основна сесія ЄВІ 2024", "session"),
+    566: ("Демоваріант УЦОЯО 2024", "official"),
+    534: ("Демоваріант УЦОЯО 2023", "official"),
+}
+KIND_TITLES = {"training": "Тренувальні", "session": "Реальні сесії", "official": "Офіційні демоваріанти УЦОЯО"}
+# Component headers that the session page puts inside the first item of each block.
+HEADER_RE = re.compile(r"^(ВЕРБАЛЬНО-КОМУНІКАТИВНИЙ|ЛОГІКО-АНАЛІТИЧНИЙ) КОМПОНЕНТ$")
 LETTERS = {"a": "А", "b": "Б", "c": "В", "d": "Г"}
 # Minimal shared prefix (in characters) for consecutive items to count as one
 # group with a common passage.
@@ -67,9 +82,10 @@ def clean(node, variant: int, session: requests.Session) -> str:
                 del tag[attr]
         if tag.name == "img" and tag.get("src"):
             tag["src"] = fetch_image(tag["src"], variant, session)
-    # drop empty paragraphs (&nbsp; fillers)
+    # drop empty paragraphs (&nbsp; fillers) and block headers
     for p in list(node.find_all("p")):
-        if not p.get_text(strip=True).replace("\xa0", "") and not p.find("img"):
+        text = p.get_text(strip=True).replace("\xa0", "")
+        if (not text and not p.find("img")) or HEADER_RE.match(text):
             p.decompose()
     html = "".join(str(c) for c in node.contents)
     html = html.replace("\u200b", "")
@@ -119,7 +135,9 @@ def contained(para: str, other_text: str, other_paras: list[str]) -> bool:
     substring for long paragraphs, fuzzy ratio for short headings."""
     n = _norm(para)
     if not n:
-        return True
+        # Image-only paragraph: shared only when a sibling shows the same file.
+        srcs = re.findall(r'src="([^"]+)"', para)
+        return all(any(src in o for o in other_paras) for src in srcs)
     if len(n) >= 40:
         return n in other_text
     return any(len(_norm(o)) < 40 and
@@ -190,7 +208,7 @@ def scrape_variant(variant: int, session: requests.Session) -> dict:
     r = session.get(url, timeout=60)
     r.raise_for_status()
     soup = BeautifulSoup(r.text, "lxml")
-    title = soup.title.string.split("–")[0].strip() if soup.title else f"Варіант {variant}"
+    title, kind = META.get(variant, (soup.title.string.split("–")[0].strip() if soup.title else f"Варіант {variant}", "other"))
     items = []
     for form in soup.select("form.q-test"):
         qid = form.select_one('input[name="q[id]"]')["value"]
@@ -232,10 +250,15 @@ def scrape_variant(variant: int, session: requests.Session) -> dict:
         groups.setdefault(it["group"], []).append(it["n"])
     print(f"  {len(items)} items; groups: "
           + ", ".join(f"{g}:{v[0]}-{v[-1]}" for g, v in groups.items() if g))
-    return {"id": variant, "title": title, "source": url, "items": items}
+    return {"id": variant, "title": title, "kind": kind, "source": url, "items": items}
 
 
 def main(argv: list[str]) -> None:
+    global OUT
+    if "--out" in argv:
+        i = argv.index("--out")
+        OUT = Path(argv[i + 1])
+        argv = argv[:i] + argv[i + 2:]
     variants = [int(a) for a in argv] or DEFAULT_VARIANTS
     session = requests.Session()
     session.headers["User-Agent"] = UA
@@ -243,6 +266,7 @@ def main(argv: list[str]) -> None:
         "generated": time.strftime("%Y-%m-%d"),
         "exam": {"minutes": 75, "max_points": 33},
         "sections": SECTION_TITLES,
+        "kinds": KIND_TITLES,
         "variants": [],
     }
     if OUT.exists():
@@ -252,11 +276,13 @@ def main(argv: list[str]) -> None:
     for v in variants:
         data["variants"].append(scrape_variant(v, session))
         time.sleep(1)
-    data["variants"].sort(key=lambda v: v["id"])
+    import build
+    notes = build.merge(data)  # patches, LaTeX cleanup, reviews, kind order
     # data.js instead of data.json so index.html also works when opened from
     # disk (file:// blocks fetch of a sibling JSON file).
     OUT.write_text(JS_PREFIX + json.dumps(data, ensure_ascii=False, indent=1) + ";\n",
                    encoding="utf-8")
+    print("\n".join(notes))
     total = sum(len(v["items"]) for v in data["variants"])
     print(f"wrote {OUT.name}: {len(data['variants'])} variants, {total} items")
 

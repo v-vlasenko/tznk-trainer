@@ -1,0 +1,34 @@
+{
+ "_comment": "Fixes for defects in the source pages (zno.osvita.ua). Key: '<variant>:<item n>'. Applied by build.py after scraping. 'answers': {letter: html} replaces an option; 'replace': [[old, new]] rewrites question and passage text (passage for the whole group).",
+ "649:18": {
+  "answers": {
+   "В": "відмінності в специфіці економік і соціального середовища в різних країнах"
+  }
+ },
+ "649:19": {
+  "answers": {
+   "Б": "Наукою не виявлено залежності інтелекту від расових особливостей людини."
+  }
+ },
+ "566:21": {
+  "replace": [
+   [
+    "здатністності",
+    "здатності"
+   ]
+  ]
+ },
+ "566:23": {
+  "replace": [
+   [
+    "зниження відсотка втрат на 15%",
+    "зниження відсотка втрат на 150%"
+   ]
+  ]
+ },
+ "566:28": {
+  "answers": {
+   "Б": "\\(\\frac 25\\)"
+  }
+ }
+}
