@@ -472,7 +472,8 @@ function renderItem(item, variantId, opts) {
   }
   const layout = el('div', { class: 'qlayout' + (item.passage ? ' has-passage' : '') });
   if (item.passage) layout.append(el('div', { class: 'card passage', html: item.passage }));
-  layout.append(body);
+  // Navigation lives under the answers, so on a wide screen it sits beside the passage.
+  layout.append(opts.actions ? el('div', {}, body, opts.actions) : body);
   return layout;
 }
 
@@ -489,11 +490,11 @@ function startSim(variantId, saved) {
   const root = el('div', {},
     el('div', { class: 'qbar' }, el('b', {}, 'Симуляція · ' + shortTitle(v)), el('span', { class: 'spacer' }), timer,
       el('button', { class: 'btn small', onclick: () => { if (confirm('Вийти? Прогрес симуляції збережеться, таймер зупиниться.')) home(); } }, 'Вийти')),
-    nav, body,
-    el('div', { class: 'qactions' },
-      el('button', { class: 'btn', onclick: () => go(idx - 1) }, '← Назад'),
-      el('button', { class: 'btn danger', onclick: () => { const left = v.items.length - Object.keys(state.answers).length; if (confirm(left ? `Без відповіді: ${left}. Завершити?` : 'Завершити тест?')) finish(); } }, 'Завершити тест'),
-      el('button', { class: 'btn primary', onclick: () => go(idx + 1) }, 'Далі →')));
+    nav, body);
+  const actions = el('div', { class: 'qactions' },
+    el('button', { class: 'btn', onclick: () => go(idx - 1) }, '← Назад'),
+    el('button', { class: 'btn danger', onclick: () => { const left = v.items.length - Object.keys(state.answers).length; if (confirm(left ? `Без відповіді: ${left}. Завершити?` : 'Завершити тест?')) finish(); } }, 'Завершити тест'),
+    el('button', { class: 'btn primary', onclick: () => go(idx + 1) }, 'Далі →'));
   show(root);
 
   function persist() { state.idx = idx; setInProgress(state); saveStore(); }
@@ -503,7 +504,7 @@ function startSim(variantId, saved) {
   function go(i, keepScroll) {
     idx = Math.max(0, Math.min(v.items.length - 1, i));
     const it = v.items[idx];
-    body.replaceChildren(renderItem(it, v.id, { selected: state.answers[it.n], onSelect: l => { state.answers[it.n] = l; persist(); go(idx, true); } }));
+    body.replaceChildren(renderItem(it, v.id, { actions, selected: state.answers[it.n], onSelect: l => { state.answers[it.n] = l; persist(); go(idx, true); } }));
     renderNav(); persist();
     if (!keepScroll) window.scrollTo({ top: 0 });
   }
@@ -577,16 +578,16 @@ function review(items, variantId, attempt, startIdx = 0) {
   const counter = el('b', {});
   const root = el('div', {},
     el('div', { class: 'qbar' }, counter, el('span', { class: 'spacer' }), el('button', { class: 'btn small', onclick: () => showResult(attempt) }, 'До результату')),
-    body,
-    el('div', { class: 'qactions' },
-      el('button', { class: 'btn', onclick: () => go(idx - 1) }, '← Назад'),
-      el('button', { class: 'btn primary', onclick: () => idx + 1 < items.length ? go(idx + 1) : showResult(attempt) }, 'Далі →')));
+    body);
+  const actions = el('div', { class: 'qactions' },
+    el('button', { class: 'btn', onclick: () => go(idx - 1) }, '← Назад'),
+    el('button', { class: 'btn primary', onclick: () => idx + 1 < items.length ? go(idx + 1) : showResult(attempt) }, 'Далі →'));
   show(root);
   function go(i) {
     idx = Math.max(0, Math.min(items.length - 1, i));
     const it = items[idx];
     counter.textContent = `Розбір ${idx + 1} / ${items.length}`;
-    body.replaceChildren(renderItem(it, variantId, { selected: attempt.answers[it.n], revealed: true, showExplanation: true }));
+    body.replaceChildren(renderItem(it, variantId, { actions, selected: attempt.answers[it.n], revealed: true, showExplanation: true }));
     window.scrollTo({ top: 0 });
   }
   document.onkeydown = e => { if (e.key === 'ArrowRight' || e.key === 'Enter') { if (idx + 1 < items.length) go(idx + 1); else showResult(attempt); } else if (e.key === 'ArrowLeft') go(idx - 1); };
@@ -633,8 +634,8 @@ function runDrill(pool, title, isErrors) {
   const backBtn = el('button', { class: 'btn', onclick: back }, '← Назад');
   const root = el('div', {},
     el('div', { class: 'qbar' }, counter, scoreEl, el('span', { class: 'spacer' }), el('button', { class: 'btn small', onclick: () => finishDrill() }, 'Завершити')),
-    body,
-    el('div', { class: 'qactions' }, backBtn, nextBtn));
+    body);
+  const actions = el('div', { class: 'qactions' }, backBtn, nextBtn);
   show(root);
   // One state per position, so going back shows the answer as it was given.
   const states = [];
@@ -645,6 +646,7 @@ function runDrill(pool, title, isErrors) {
     scoreEl.textContent = `правильно ${ok} · помилок ${bad}`;
     cur = states[idx] || (states[idx] = { order: shuffle(item.answers.map(a => a.letter)), selected: null, revealed: false });
     body.replaceChildren(renderItem(item, variantId, {
+      actions,
       order: cur.order, selected: cur.selected, revealed: cur.revealed,
       showExplanation: cur.revealed && cur.selected !== item.correct,
       onSelect: l => {
@@ -721,16 +723,16 @@ function runDrill(pool, title, isErrors) {
     const counter = el('b', {});
     const root = el('div', {},
       el('div', { class: 'qbar' }, counter, el('span', { class: 'spacer' }), el('button', { class: 'btn small', onclick: finishDrill }, 'До підсумку')),
-      body,
-      el('div', { class: 'qactions' },
-        el('button', { class: 'btn', onclick: () => go(i - 1) }, '← Назад'),
-        el('button', { class: 'btn primary', onclick: () => i + 1 < list.length ? go(i + 1) : finishDrill() }, 'Далі →')));
+      body);
+    const actions = el('div', { class: 'qactions' },
+      el('button', { class: 'btn', onclick: () => go(i - 1) }, '← Назад'),
+      el('button', { class: 'btn primary', onclick: () => i + 1 < list.length ? go(i + 1) : finishDrill() }, 'Далі →'));
     show(root);
     function go(k) {
       i = Math.max(0, Math.min(list.length - 1, k));
       const r = list[i];
       counter.textContent = `Розбір помилки ${i + 1} / ${list.length}`;
-      body.replaceChildren(renderItem(r.item, r.variantId, { order: r.order, selected: r.selected, revealed: true, showExplanation: true }));
+      body.replaceChildren(renderItem(r.item, r.variantId, { actions, order: r.order, selected: r.selected, revealed: true, showExplanation: true }));
       window.scrollTo({ top: 0 });
     }
     document.onkeydown = e => { if (e.key === 'ArrowRight' || e.key === 'Enter') { if (i + 1 < list.length) go(i + 1); else finishDrill(); } else if (e.key === 'ArrowLeft') go(i - 1); };
