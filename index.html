@@ -367,7 +367,7 @@ function signInOffer() {
   const overlay = el('div', { class: 'overlay', onclick: e => { if (e.target === overlay) close(); } },
     el('div', { class: 'modal card' },
       el('h2', { style: 'margin-top:0' }, 'Зберігати прогрес?'),
-      el('p', {}, 'Зараз прогрес живе лише в цьому браузері й зникне, якщо очистити дані. Після входу через Google він зберігається в хмарі й синхронізується між телефоном і ноутбуком.'),
+      el('p', {}, 'Зараз прогрес живе лише в цьому браузері. Після входу через Google він зберігається в хмарі й синхронізується між телефоном і ноутбуком.'),
       el('div', { class: 'row' },
         el('button', { class: 'btn primary', onclick: () => { close(); sync.signIn(); } }, 'Увійти через Google'),
         el('button', { class: 'btn', onclick: () => { try { localStorage.setItem('tznk.nosignin', '1'); } catch (e) { /* private mode */ } close(); } }, 'Не зараз'))));
