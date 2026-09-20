@@ -34,6 +34,21 @@ python3 -m venv .venv
 
 Скрипт зберігає картинки в `img/<variant>/` і виносить спільний текст групи завдань (тексти для читання, описи ситуацій) в окреме поле `passage`, щоб показувати його один раз.
 
+## Синхронізація прогресу
+
+Без входу прогрес живе в localStorage браузера. Кнопка «Увійти через Google» у шапці вмикає синхронізацію через Firebase (проєкт `tznk-trainer`, Spark-план): документ `users/<uid>` у Firestore з тим самим JSON, що й локально. Локальна копія лишається основною, хмара зливається з нею об'єднанням історій і максимумом лічильників, тому телефон і ноутбук не затирають один одного. Правила доступу в `firestore.rules`: кожен читає й пише лише свій документ, акаунти зі списку `admins` у `firebase-config.js` бачать сторінку «Прогрес усіх».
+
+Оновити правила після зміни:
+
+```bash
+T=$(gcloud auth print-access-token); P=tznk-trainer
+RN=$(curl -s -X POST -H "Authorization: Bearer $T" -H "x-goog-user-project: $P" -H "Content-Type: application/json" \
+  "https://firebaserules.googleapis.com/v1/projects/$P/rulesets" \
+  -d "$(python3 -c 'import json;print(json.dumps({"source":{"files":[{"name":"firestore.rules","content":open("firestore.rules").read()}]}}))')" | python3 -c 'import json,sys;print(json.load(sys.stdin)["name"])')
+curl -s -X PATCH -H "Authorization: Bearer $T" -H "x-goog-user-project: $P" -H "Content-Type: application/json" \
+  "https://firebaserules.googleapis.com/v1/projects/$P/releases/cloud.firestore" -d "{\"release\":{\"name\":\"projects/$P/releases/cloud.firestore\",\"rulesetName\":\"$RN\"}}"
+```
+
 ## Хостинг
 
 Це один `index.html` плюс `data.js` та папка `img/`. Працює з GitHub Pages або відкритий з диска.

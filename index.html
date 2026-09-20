@@ -166,6 +166,9 @@ table.hist td.kind { color: var(--muted); font-size: 12px; text-transform: upper
 .answers2 .pill { white-space: normal; text-align: right; }
 @media (max-width: 700px) { .item.link { flex-direction: column; align-items: flex-start; } .answers2 { align-items: flex-start; max-width: 100%; } .answers2 .pill { text-align: left; } }
 footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 16px; }
+.acct { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.acct img { width: 24px; height: 24px; border-radius: 50%; }
+@media (max-width: 600px) { .acct .name { display: none; } }
 </style>
 </head>
 <body>
@@ -175,6 +178,7 @@ footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px
     <div class="sub" id="subtitle">ЄВІ · 27 завдань · 33 бали · 75 хвилин</div>
   </div>
   <div class="row">
+    <span class="row" id="account"></span>
     <button class="btn small" id="homeBtn">Головна</button>
   </div>
 </header>
@@ -222,12 +226,23 @@ const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0
 const keyOf = (v, n) => `${v}:${n}`;
 
 // ---------- storage ----------
-const emptyStore = () => ({ attempts: [], errors: {}, drill: {}, inProgress: null });
+const emptyStore = () => ({ attempts: [], errors: {}, drill: {}, sessions: [], inProgress: null });
 let store = emptyStore();
 function loadStore() {
   try { const raw = localStorage.getItem(STORE_KEY); if (raw) store = Object.assign(emptyStore(), JSON.parse(raw)); } catch (e) { store = emptyStore(); }
 }
-function saveStore() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* private mode */ } }
+function saveStore() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* private mode */ }
+  if (window.TZNK_SYNC) window.TZNK_SYNC.schedulePush();
+}
+// Hooks for sync.js (cloud sync is optional and lives in a separate module).
+window.TZNK_APP = {
+  getStore: () => store,
+  setStore: s => { store = Object.assign(emptyStore(), s); try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* private mode */ } },
+  rerenderHome: () => home(),
+  isHome: () => !document.querySelector('.qbar'),
+  el: (...a) => el(...a),
+};
 function recordAnswer(item, variantId, correct) {
   const k = keyOf(variantId, item.n);
   const d = store.drill[k] || (store.drill[k] = { ok: 0, bad: 0 });
@@ -305,6 +320,8 @@ function home() {
     el('div', { class: 'card' }, variantTable()),
     attempts.length ? el('h2', { class: 'sec' }, 'Історія симуляцій') : null,
     attempts.length ? el('div', { class: 'card' }, historyTable(attempts)) : null,
+    (store.sessions || []).length ? el('h2', { class: 'sec' }, 'Історія тренажера') : null,
+    (store.sessions || []).length ? el('div', { class: 'card' }, sessionsTable(store.sessions.slice(-15).reverse())) : null,
     el('h2', { class: 'sec' }, 'Дані'),
     el('div', { class: 'card row small' },
       el('button', { class: 'btn small', onclick: exportProgress }, 'Експорт прогресу'),
@@ -330,6 +347,16 @@ function variantTable() {
     const errs = v.items.filter(it => store.errors[keyOf(v.id, it.n)]).length;
     t.append(el('tr', {}, el('td', {}, el('a', { href: v.source, target: '_blank', rel: 'noopener' }, shortTitle(v))),
       el('td', { class: 'hide-sm' }, att.length), el('td', {}, best === null ? '—' : `${best}/${MAX_POINTS}`), el('td', {}, `${solved}/${v.items.length}`), el('td', {}, errs || '—')));
+  }
+  return el('div', { class: 'tablewrap' }, t);
+}
+function sessionsTable(sessions) {
+  const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Дата'), el('th', {}, 'Режим'), el('th', {}, 'Результат'), el('th', { class: 'hide-sm' }, 'По блоках')));
+  for (const s of sessions) {
+    const parts = Object.entries(s.sections || {}).map(([sec, [ok, total]]) => `${DATA.sections[sec].split(':')[0]} ${ok}/${total}`);
+    t.append(el('tr', {}, el('td', {}, fmtDate(s.date)), el('td', {}, s.title),
+      el('td', {}, el('span', { class: 'pill ' + (s.ok === s.total ? 'ok' : s.ok / s.total < 0.7 ? 'bad' : '') }, `${s.ok}/${s.total}`)),
+      el('td', { class: 'hide-sm muted' }, parts.join(' · '))));
   }
   return el('div', { class: 'tablewrap' }, t);
 }
@@ -599,8 +626,17 @@ function runDrill(pool, title, isErrors) {
     if (idx === 0) return;
     idx--; render(); window.scrollTo({ top: 0 });
   }
+  let logged = false;
   function finishDrill() {
     document.onkeydown = null;
+    if (!logged && results.length) {
+      logged = true;
+      const sections = {};
+      for (const r of results) { const x = sections[r.item.section] || (sections[r.item.section] = [0, 0]); x[1]++; if (r.good) x[0]++; }
+      (store.sessions || (store.sessions = [])).push({ date: new Date().toISOString(), title, ok, total: ok + bad, sections });
+      if (store.sessions.length > 200) store.sessions = store.sessions.slice(-200);
+      saveStore();
+    }
     const fixed = results.filter(r => r.good).length;
     const wrong = results.filter(r => !r.good).sort((a, b) => a.variantId - b.variantId || a.item.n - b.item.n);
     const oneVariant = new Set(results.map(r => r.variantId)).size === 1;
@@ -679,5 +715,7 @@ function boot() {
 }
 boot();
 </script>
+<script src="firebase-config.js"></script>
+<script type="module" src="sync.js"></script>
 </body>
 </html>

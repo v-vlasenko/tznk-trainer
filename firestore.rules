@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each signed-in person owns one document with their progress.
+    // Admins (family members who follow the preparation) may read everyone's.
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email in ['vladyslav1595@gmail.com'];
+    }
+    match /users/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['attempts', 'errors', 'drill', 'sessions', 'inProgress', 'name', 'email', 'photo', 'updatedAt', 'device'])
+        && request.resource.size() < 900000;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
