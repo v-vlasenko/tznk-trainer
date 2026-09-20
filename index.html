@@ -347,8 +347,7 @@ function home() {
       ...(window.TZNK_SYNC && window.TZNK_SYNC.isSignedIn() ? [] : [
         el('button', { class: 'btn small', onclick: exportProgress }, 'Експорт прогресу'),
         el('label', { class: 'btn small' }, 'Імпорт прогресу', el('input', { type: 'file', accept: 'application/json', class: 'hidden', onchange: importProgress }))]),
-      el('button', { class: 'btn small danger', onclick: () => { if (confirm(window.TZNK_SYNC && window.TZNK_SYNC.isSignedIn() ? 'Видалити весь прогрес, разом із хмарною копією?' : 'Видалити весь прогрес у цьому браузері?')) { store = emptyStore(); store.resetAt = new Date().toISOString(); saveStore(); home(); } } }, 'Скинути все'),
-      el('span', { class: 'muted' }, `Дані оновлено ${DATA.generated}.`)));
+      el('button', { class: 'btn small danger', onclick: () => { if (confirm(window.TZNK_SYNC && window.TZNK_SYNC.isSignedIn() ? 'Видалити весь прогрес, разом із хмарною копією?' : 'Видалити весь прогрес у цьому браузері?')) { store = emptyStore(); store.resetAt = new Date().toISOString(); saveStore(); home(); } } }, 'Скинути все')));
   show(node);
 }
 function shortTitle(v) { return v.title; }
