@@ -76,6 +76,15 @@ h2.sec { font-size: 16px; margin: 22px 0 10px; color: var(--muted); font-weight:
 table.hist { width: 100%; font-size: 14px; }
 table.hist td, table.hist th { border: 0; border-bottom: 1px solid var(--line); text-align: left; padding: 8px 6px; }
 table.hist th { color: var(--muted); font-weight: 600; }
+.tablewrap { overflow-x: auto; }
+@media (max-width: 600px) {
+  table.hist { font-size: 13px; }
+  table.hist td, table.hist th { padding: 8px 4px; }
+  table.hist .hide-sm { display: none; }
+  table.hist .show-sm { display: initial; }
+  table.hist th { font-size: 12px; }
+}
+.show-sm { display: none; }
 table.hist td.kind { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding-top: 14px; }
 .expl.review { background: var(--accent-soft); }
 .expl details { margin-top: 10px; }
@@ -311,7 +320,7 @@ function variantOptions() {
   return Object.entries(groups).map(([k, vs]) => el('optgroup', { label: DATA.kinds[k] || k }, ...vs.map(v => el('option', { value: v.id }, v.title))));
 }
 function variantTable() {
-  const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Варіант'), el('th', {}, 'Симуляцій'), el('th', {}, 'Найкращий'), el('th', {}, 'Розв’язано в тренажері'), el('th', {}, 'Помилок')));
+  const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Варіант'), el('th', { class: 'hide-sm' }, 'Симуляцій'), el('th', {}, el('span', { class: 'hide-sm' }, 'Найкращий'), el('span', { class: 'show-sm' }, 'Бал')), el('th', {}, 'Тренажер'), el('th', {}, 'Помилок')));
   let lastKind = null;
   for (const v of DATA.variants) {
     if (v.kind !== lastKind) { t.append(el('tr', {}, el('td', { colspan: 5, class: 'kind' }, DATA.kinds[v.kind] || v.kind))); lastKind = v.kind; }
@@ -320,18 +329,18 @@ function variantTable() {
     const solved = v.items.filter(it => (store.drill[keyOf(v.id, it.n)] || {}).ok > 0).length;
     const errs = v.items.filter(it => store.errors[keyOf(v.id, it.n)]).length;
     t.append(el('tr', {}, el('td', {}, el('a', { href: v.source, target: '_blank', rel: 'noopener' }, shortTitle(v))),
-      el('td', {}, att.length), el('td', {}, best === null ? '—' : `${best}/${MAX_POINTS}`), el('td', {}, `${solved}/${v.items.length}`), el('td', {}, errs || '—')));
+      el('td', { class: 'hide-sm' }, att.length), el('td', {}, best === null ? '—' : `${best}/${MAX_POINTS}`), el('td', {}, `${solved}/${v.items.length}`), el('td', {}, errs || '—')));
   }
-  return t;
+  return el('div', { class: 'tablewrap' }, t);
 }
 function historyTable(attempts) {
-  const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Дата'), el('th', {}, 'Варіант'), el('th', {}, 'Бали'), el('th', {}, 'Шкала'), el('th', {}, 'Час'), el('th', {}, '')));
+  const t = el('table', { class: 'hist' }, el('tr', {}, el('th', {}, 'Дата'), el('th', {}, 'Варіант'), el('th', {}, 'Бали'), el('th', {}, 'Шкала'), el('th', { class: 'hide-sm' }, 'Час'), el('th', {}, '')));
   for (const a of attempts) {
     t.append(el('tr', {}, el('td', {}, fmtDate(a.date)), el('td', {}, shortTitle(variantById(a.variantId))),
-      el('td', {}, `${a.score}/${MAX_POINTS}`), el('td', {}, scaleOf(a.score) ?? 'не склала'), el('td', {}, fmtTime(a.seconds)),
+      el('td', {}, `${a.score}/${MAX_POINTS}`), el('td', {}, scaleOf(a.score) ?? 'не склала'), el('td', { class: 'hide-sm' }, fmtTime(a.seconds)),
       el('td', {}, el('button', { class: 'btn small', onclick: () => showResult(a) }, 'Розбір'))));
   }
-  return t;
+  return el('div', { class: 'tablewrap' }, t);
 }
 function exportProgress() {
   const blob = new Blob([JSON.stringify(store, null, 1)], { type: 'application/json' });
