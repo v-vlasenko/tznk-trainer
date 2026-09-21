@@ -207,7 +207,7 @@ footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px
 <footer>
   Завдання та пояснення: <a href="https://zno.osvita.ua/master/tznpk/" target="_blank" rel="noopener">ЗНО-онлайн (Освіта.ua)</a>.
   Формат і шкала: <a href="https://testportal.gov.ua/yedynyj-vstupnyj-ispyt-2026/" target="_blank" rel="noopener">УЦОЯО</a>.
-  Прогрес зберігається лише в цьому браузері.
+  Прогрес зберігається в цьому браузері, після входу через Google — і в хмарі.
 </footer>
 
 <script src="data.js"></script>
@@ -493,10 +493,10 @@ function startSim(variantId, saved) {
     el('div', { class: 'qbar' }, el('b', {}, 'Симуляція · ' + shortTitle(v)), el('span', { class: 'spacer' }), timer,
       el('button', { class: 'btn small', onclick: () => { if (confirm('Вийти? Прогрес симуляції збережеться, таймер зупиниться.')) home(); } }, 'Вийти')),
     nav, body);
-  const actions = el('div', { class: 'qactions' },
-    el('button', { class: 'btn', onclick: () => go(idx - 1) }, '← Назад'),
-    el('button', { class: 'btn danger', onclick: () => { const left = v.items.length - Object.keys(state.answers).length; if (confirm(left ? `Без відповіді: ${left}. Завершити?` : 'Завершити тест?')) finish(); } }, 'Завершити тест'),
-    el('button', { class: 'btn primary', onclick: () => go(idx + 1) }, 'Далі →'));
+  const askFinish = () => { const left = v.items.length - Object.keys(state.answers).length; if (confirm(left ? `Без відповіді: ${left}. Завершити?` : 'Завершити тест?')) finish(); };
+  const backBtn = el('button', { class: 'btn', onclick: () => go(idx - 1) }, '← Назад');
+  const nextBtn = el('button', { class: 'btn primary', onclick: () => idx + 1 < v.items.length ? go(idx + 1) : askFinish() }, 'Далі →');
+  const actions = el('div', { class: 'qactions' }, backBtn, el('button', { class: 'btn danger', onclick: askFinish }, 'Завершити тест'), nextBtn);
   show(root);
 
   function persist() { state.idx = idx; setInProgress(state); saveStore(); }
@@ -508,6 +508,8 @@ function startSim(variantId, saved) {
     const it = v.items[idx];
     body.replaceChildren(renderItem(it, v.id, { actions, selected: state.answers[it.n], onSelect: l => { state.answers[it.n] = l; persist(); go(idx, true); } }));
     renderNav(); persist();
+    backBtn.disabled = idx === 0;
+    nextBtn.textContent = idx + 1 < v.items.length ? 'Далі →' : 'Завершити тест';
     if (!keepScroll) window.scrollTo({ top: 0 });
   }
   function finish() {
