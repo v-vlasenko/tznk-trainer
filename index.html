@@ -496,7 +496,8 @@ function startSim(variantId, saved) {
   const askFinish = () => { const left = v.items.length - Object.keys(state.answers).length; if (confirm(left ? `Без відповіді: ${left}. Завершити?` : 'Завершити тест?')) finish(); };
   const backBtn = el('button', { class: 'btn', onclick: () => go(idx - 1) }, '← Назад');
   const nextBtn = el('button', { class: 'btn primary', onclick: () => idx + 1 < v.items.length ? go(idx + 1) : askFinish() }, 'Далі →');
-  const actions = el('div', { class: 'qactions' }, backBtn, el('button', { class: 'btn danger', onclick: askFinish }, 'Завершити тест'), nextBtn);
+  const finishBtn = el('button', { class: 'btn danger', onclick: askFinish }, 'Завершити тест');
+  const actions = el('div', { class: 'qactions' }, backBtn, finishBtn, nextBtn);
   show(root);
 
   function persist() { state.idx = idx; setInProgress(state); saveStore(); }
@@ -509,7 +510,9 @@ function startSim(variantId, saved) {
     body.replaceChildren(renderItem(it, v.id, { actions, selected: state.answers[it.n], onSelect: l => { state.answers[it.n] = l; persist(); go(idx, true); } }));
     renderNav(); persist();
     backBtn.disabled = idx === 0;
-    nextBtn.textContent = idx + 1 < v.items.length ? 'Далі →' : 'Завершити тест';
+    const last = idx + 1 === v.items.length;
+    nextBtn.textContent = last ? 'Завершити тест' : 'Далі →';
+    finishBtn.style.visibility = last ? 'hidden' : '';
     if (!keepScroll) window.scrollTo({ top: 0 });
   }
   function finish() {
