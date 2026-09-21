@@ -51,6 +51,7 @@ def apply_patches(data: dict) -> int:
                     it[field] = patch[field]
             for old, new in patch.get("replace", []):
                 it["question"] = it["question"].replace(old, new)
+                it["explanation"] = it["explanation"].replace(old, new)
                 # The passage is shared by every item of the group.
                 for sib in v["items"]:
                     if sib.get("group") and sib["group"] == it.get("group") or sib is it:
