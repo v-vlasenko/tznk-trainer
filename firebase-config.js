@@ -10,5 +10,5 @@ window.TZNK_FIREBASE = {
   // Google accounts that may open "Прогрес усіх". Keep in sync with firestore.rules.
   admins: ["vladyslav1595@gmail.com"],
   // Apps Script web app that emails each feedback message (see feedback-hook.gs). Empty: Firestore only.
-  feedbackHook: "",
+  feedbackHook: "https://script.google.com/macros/s/AKfycbyugs_7mzRuo38qcLLh7KGBuFymhGrGaeyIzh6rXwKWrpD3WG4GFAkNf7LLF5KCY3hyJw/exec",
 };
