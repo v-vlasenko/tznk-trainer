@@ -161,6 +161,7 @@ function renderSlot() {
       avatar, el('span', { class: 'sync-status muted small' }, '')),
     el('span', { class: 'drop' },
       el('span', { class: 'who' }, user.displayName || '', el('br'), user.email || ''),
+      themeSwitch(),
       el('button', { class: 'btn small', onclick: feedbackModal }, 'Повідомити про проблему'),
       isAdmin() ? el('button', { class: 'btn small', onclick: showAll }, 'Прогрес усіх') : null,
       isAdmin() ? el('button', { class: 'btn small', onclick: showFeedback }, 'Відгуки') : null,
@@ -217,6 +218,14 @@ async function showAll() {
     ...(cards.length ? cards : [el('p', { class: 'muted' }, 'Поки ніхто не входив.')]),
     el('button', { class: 'btn', onclick: APP.rerenderHome }, 'На головну'));
   window.scrollTo({ top: 0 });
+}
+
+function themeSwitch() {
+  const row = el('span', { class: 'theme' });
+  const draw = () => row.replaceChildren(...[['auto', 'Авто'], ['light', 'Світла'], ['dark', 'Темна']].map(([v, label]) =>
+    el('button', { class: 'btn small' + (APP.getTheme() === v ? ' on' : ''), onclick: e => { e.stopPropagation(); APP.setTheme(v); draw(); } }, label)));
+  draw();
+  return row;
 }
 
 // ---------- feedback ----------

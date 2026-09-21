@@ -7,6 +7,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>ТЗНК тренажер</title>
 <meta name="description" content="Тренажер для підготовки до ТЗНК (ЄВІ): симуляція іспиту, тренування з поясненнями, повторення помилок.">
+<script>try { const t = localStorage.getItem('tznk.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* private mode */ }</script>
 <style>
 :root {
   --bg: #f6f7f9; --card: #ffffff; --text: #1c1f26; --muted: #6b7280; --line: #e3e6eb;
@@ -56,6 +57,7 @@ header.top {
 .menu { position: relative; }
 .menu .drop { position: absolute; right: 0; top: 34px; display: none; flex-direction: column; gap: 6px; padding: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); z-index: 6; min-width: 160px; }
 .menu.open .drop { display: flex; }
+.menu .theme { display: flex; gap: 4px; } .menu .theme button { flex: 1; } .menu .theme button.on { background: var(--accent); color: var(--bg); border-color: transparent; }
 .menu .who { padding: 4px 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 header.top h1 { font-size: 18px; margin: 0; font-weight: 650; }
 header.top .sub { color: var(--muted); font-size: 13px; }
@@ -264,6 +266,11 @@ window.TZNK_APP = {
   rerenderHome: () => home(),
   isHome: () => !document.querySelector('.qbar'),
   el: (...a) => el(...a),
+  getTheme: () => document.documentElement.dataset.theme || 'auto',
+  setTheme: t => {
+    if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+    try { t === 'auto' ? localStorage.removeItem('tznk.theme') : localStorage.setItem('tznk.theme', t); } catch (e) { /* private mode */ }
+  },
 };
 function setInProgress(state) { store.inProgress = state; store.inProgressAt = new Date().toISOString(); }
 function recordAnswer(item, variantId, correct) {
