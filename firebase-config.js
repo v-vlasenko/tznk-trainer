@@ -2,7 +2,7 @@
 // Firestore rules and by the authorized domains of the Auth project).
 window.TZNK_FIREBASE = {
   firebase: {
-    apiKey: "AIzaSyBDm-CFh4i1lifnciZy4Xz6GCmyo_6zo8k",
+    apiKey: "AIzaSyBeemcqNyJc0VTcK5XATDdUIZFs7kpj7_8",
     authDomain: "tznk-trainer.firebaseapp.com",
     projectId: "tznk-trainer",
     appId: "1:1095506791574:web:7792b049e71f8468ab86b7",
