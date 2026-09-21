@@ -8,7 +8,7 @@ if (cfg && APP) main().catch(e => console.warn('sync: disabled', e));
 async function main() {
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
 const [{ initializeApp }, { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut },
-  { getFirestore, doc, collection, getDoc, getDocs, setDoc, serverTimestamp }] = await Promise.all([
+  { getFirestore, doc, collection, getDoc, getDocs, setDoc, addDoc, deleteDoc, query, orderBy, limit, serverTimestamp }] = await Promise.all([
   import(SDK + 'firebase-app.js'), import(SDK + 'firebase-auth.js'), import(SDK + 'firebase-firestore.js')]);
 
 const fb = initializeApp(cfg.firebase);
@@ -161,7 +161,9 @@ function renderSlot() {
       avatar, el('span', { class: 'sync-status muted small' }, '')),
     el('span', { class: 'drop' },
       el('span', { class: 'who' }, user.displayName || '', el('br'), user.email || ''),
+      el('button', { class: 'btn small', onclick: feedbackModal }, 'Повідомити про проблему'),
       isAdmin() ? el('button', { class: 'btn small', onclick: showAll }, 'Прогрес усіх') : null,
+      isAdmin() ? el('button', { class: 'btn small', onclick: showFeedback }, 'Відгуки') : null,
       el('button', { class: 'btn small', onclick: leave }, 'Вийти')));
   slot.replaceChildren(menu);
 }
@@ -213,6 +215,110 @@ async function showAll() {
   document.getElementById('app').replaceChildren(
     el('h2', { class: 'sec' }, 'Прогрес усіх, хто входив'),
     ...(cards.length ? cards : [el('p', { class: 'muted' }, 'Поки ніхто не входив.')]),
+    el('button', { class: 'btn', onclick: APP.rerenderHome }, 'На головну'));
+  window.scrollTo({ top: 0 });
+}
+
+// ---------- feedback ----------
+// A note plus an optional screenshot. Stored in Firestore (the screenshot as a JPEG
+// data URL under the 1 MiB document limit) and, when cfg.feedbackHook is set, posted
+// to an Apps Script web app that emails it. Firebase Storage and Cloud Functions
+// need the paid plan, this needs none.
+function shrinkImage(file) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      let q = 0.85, out = c.toDataURL('image/jpeg', q);
+      while (out.length > 850000 && q > 0.3) { q -= 0.15; out = c.toDataURL('image/jpeg', q); }
+      URL.revokeObjectURL(img.src);
+      resolve(out.length > 850000 ? null : out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(img.src); resolve(null); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function whereAmI() {
+  const bar = document.querySelector('.qbar b'), q = document.querySelector('.qhead .n');
+  return [bar && bar.textContent, q && q.textContent].filter(Boolean).join(' · ') || 'Головна';
+}
+
+function feedbackModal() {
+  let image = null;
+  const context = whereAmI();
+  const text = el('textarea', { rows: 5, placeholder: 'Що не так? Де саме, що очікували побачити.' });
+  const preview = el('div', { class: 'shot' });
+  const file = el('input', { type: 'file', accept: 'image/*', style: 'display:none', onchange: () => take(file.files[0]) });
+  const status = el('span', { class: 'muted small' });
+  const send = el('button', { class: 'btn primary' }, 'Надіслати');
+  async function take(f) {
+    if (!f) return;
+    status.textContent = 'стискаю…';
+    image = await shrinkImage(f);
+    status.textContent = image ? '' : 'Не вдалося прочитати зображення';
+    preview.replaceChildren(image ? el('img', { src: image, alt: '' }) : null,
+      image ? el('button', { class: 'btn small', onclick: () => { image = null; preview.replaceChildren(); } }, 'Прибрати скріншот') : null);
+  }
+  const close = () => overlay.remove();
+  const overlay = el('div', { class: 'overlay', onclick: e => { if (e.target === overlay) close(); },
+    onpaste: e => { const f = [...(e.clipboardData?.files || [])].find(x => x.type.startsWith('image/')); if (f) { e.preventDefault(); take(f); } } },
+    el('div', { class: 'modal card' },
+      el('h2', { style: 'margin-top:0' }, 'Повідомити про проблему'),
+      el('p', { class: 'muted small' }, 'Сторінка: ' + context),
+      text,
+      el('div', { class: 'row', style: 'margin-top:10px' },
+        el('button', { class: 'btn small', onclick: () => file.click() }, 'Додати скріншот'), file,
+        el('span', { class: 'muted small' }, 'або вставте з буфера (Ctrl+V)'), status),
+      preview,
+      el('div', { class: 'row', style: 'margin-top:14px' }, send, el('button', { class: 'btn', onclick: close }, 'Скасувати'))));
+  send.addEventListener('click', async () => {
+    const t = text.value.trim();
+    if (!t && !image) { text.focus(); return; }
+    send.disabled = true; status.textContent = 'надсилаю…';
+    const data = { uid: user.uid, email: user.email || null, name: user.displayName || null, text: t.slice(0, 4000), image, context,
+      ua: navigator.userAgent.slice(0, 300), createdAt: serverTimestamp() };
+    try {
+      await addDoc(collection(db, 'feedback'), data);
+    } catch (e) {
+      send.disabled = false; status.textContent = 'Не вдалося надіслати: ' + (e.code || e.message); console.warn(e); return;
+    }
+    if (cfg.feedbackHook) {
+      // Opaque response: the hook either mailed it or not, the Firestore copy is the record.
+      fetch(cfg.feedbackHook, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ ...data, createdAt: new Date().toISOString() }) }).catch(e => console.warn('feedback hook', e));
+    }
+    close();
+    alert('Дякую, повідомлення надіслано.');
+  });
+  document.body.append(overlay);
+  text.focus();
+}
+
+// Admin view: newest first, with the screenshot and a delete button.
+async function showFeedback() {
+  const snaps = await getDocs(query(collection(db, 'feedback'), orderBy('createdAt', 'desc'), limit(100)));
+  const rows = [];
+  snaps.forEach(s => rows.push({ id: s.id, ...s.data() }));
+  const fmt = ts => ts?.toDate ? ts.toDate().toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+  const cards = rows.map(f => {
+    const card = el('div', { class: 'card', style: 'margin-bottom:12px' },
+      el('div', { class: 'row' }, el('b', {}, f.name || f.email || f.uid), el('span', { class: 'muted small' }, f.email || ''),
+        el('span', { class: 'spacer' }), el('span', { class: 'muted small' }, fmt(f.createdAt))),
+      el('div', { class: 'muted small', style: 'margin:6px 0' }, 'Сторінка: ' + (f.context || '—')),
+      f.text ? el('p', { style: 'white-space:pre-wrap' }, f.text) : null,
+      f.image ? el('a', { href: f.image, target: '_blank', rel: 'noopener' }, el('img', { src: f.image, alt: '', class: 'shot' })) : null,
+      el('div', { class: 'muted small', style: 'margin-top:6px;word-break:break-all' }, f.ua || ''),
+      el('div', { class: 'row', style: 'margin-top:10px' },
+        el('button', { class: 'btn small danger', onclick: async () => { if (!confirm('Видалити відгук?')) return; await deleteDoc(doc(db, 'feedback', f.id)); card.remove(); } }, 'Видалити')));
+    return card;
+  });
+  document.getElementById('app').replaceChildren(
+    el('h2', { class: 'sec' }, 'Відгуки'),
+    ...(cards.length ? cards : [el('p', { class: 'muted' }, 'Поки нічого.')]),
     el('button', { class: 'btn', onclick: APP.rerenderHome }, 'На головну'));
   window.scrollTo({ top: 0 });
 }

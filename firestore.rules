@@ -12,6 +12,14 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['attempts', 'errors', 'drill', 'sessions', 'inProgress', 'inProgressAt', 'errorsClearedAt', 'resetAt', 'savedAt', 'name', 'email', 'photo', 'updatedAt', 'device']);
     }
+    // Bug reports with an optional screenshot (JPEG data URL, well under the 1 MiB document limit).
+    match /feedback/{id} {
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'name', 'text', 'image', 'context', 'ua', 'createdAt'])
+        && request.resource.data.text is string && request.resource.data.text.size() <= 4000
+        && (request.resource.data.image == null || (request.resource.data.image is string && request.resource.data.image.size() <= 900000));
+      allow read, delete: if isAdmin();
+    }
     match /{document=**} {
       allow read, write: if false;
     }

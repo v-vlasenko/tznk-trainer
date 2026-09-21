@@ -75,7 +75,7 @@ header.top .sub { color: var(--muted); font-size: 13px; }
 .btn.danger { color: var(--bad); }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn.small { padding: 5px 10px; font-size: 14px; }
-select, input[type=number] {
+select, textarea, input[type=number] {
   font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line);
   border-radius: 10px; padding: 8px 10px;
 }
@@ -180,7 +180,9 @@ table.hist td.kind { color: var(--muted); font-size: 12px; text-transform: upper
 @media (max-width: 700px) { .item.link { flex-direction: column; align-items: flex-start; } .answers2 { align-items: flex-start; max-width: 100%; } .answers2 .pill { text-align: left; } }
 footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 16px; }
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
-.modal { max-width: 440px; width: 100%; }
+.modal { max-width: 440px; width: 100%; max-height: calc(100vh - 32px); overflow: auto; }
+.modal textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.shot { margin-top: 10px; } .shot img, img.shot { max-width: 100%; max-height: 260px; border-radius: 8px; border: 1px solid var(--line); display: block; margin-bottom: 8px; }
 .acct { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 3px 8px; }
 .acct img { width: 24px; height: 24px; border-radius: 50%; }
 @media (max-width: 600px) { .acct .name { display: none; } }
