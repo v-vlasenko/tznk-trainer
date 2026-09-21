@@ -115,7 +115,7 @@ table.hist td.kind { color: var(--muted); font-size: 12px; text-transform: upper
   font-size: 13px; font-weight: 600; padding: 0;
 }
 .nav button.cur { outline: 2px solid var(--accent); outline-offset: 1px; }
-.nav button.done { background: var(--accent-soft); border-color: transparent; }
+.nav button.done { background: var(--accent); color: var(--bg); border-color: transparent; }
 .nav button.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
 .nav button.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
 .qlayout { display: grid; gap: 14px; grid-template-columns: 1fr; }
@@ -487,10 +487,11 @@ function startSim(variantId, saved) {
   let idx = state.idx || 0;
 
   const timer = el('span', { class: 'timer' }, fmtTime(state.remaining));
+  const answered = el('span', { class: 'muted small hide-sm' });
   const nav = el('div', { class: 'nav' });
   const body = el('div', {});
   const root = el('div', {},
-    el('div', { class: 'qbar' }, el('b', {}, 'Симуляція · ' + shortTitle(v)), el('span', { class: 'spacer' }), timer,
+    el('div', { class: 'qbar' }, el('b', {}, 'Симуляція · ' + shortTitle(v)), el('span', { class: 'spacer' }), answered, timer,
       el('button', { class: 'btn small', onclick: () => { if (confirm('Вийти? Прогрес симуляції збережеться, таймер зупиниться.')) home(); } }, 'Вийти')),
     nav, body);
   const askFinish = () => { const left = v.items.length - Object.keys(state.answers).length; if (confirm(left ? `Без відповіді: ${left}. Завершити?` : 'Завершити тест?')) finish(); };
@@ -503,6 +504,7 @@ function startSim(variantId, saved) {
   function persist() { state.idx = idx; setInProgress(state); saveStore(); }
   function renderNav() {
     nav.replaceChildren(...v.items.map((it, i) => el('button', { class: (i === idx ? 'cur ' : '') + (state.answers[it.n] ? 'done' : ''), onclick: () => go(i) }, it.n)));
+    answered.textContent = `відповідей ${Object.keys(state.answers).length} / ${v.items.length}`;
   }
   function go(i, keepScroll) {
     idx = Math.max(0, Math.min(v.items.length - 1, i));
