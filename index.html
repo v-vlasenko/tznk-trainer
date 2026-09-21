@@ -516,7 +516,7 @@ function startSim(variantId, saved) {
   function go(i, keepScroll) {
     idx = Math.max(0, Math.min(v.items.length - 1, i));
     const it = v.items[idx];
-    body.replaceChildren(renderItem(it, v.id, { actions, selected: state.answers[it.n], onSelect: l => { if (state.answers[it.n] === l) delete state.answers[it.n]; else state.answers[it.n] = l; persist(); go(idx, true); } }));
+    body.replaceChildren(renderItem(it, v.id, { actions, selected: state.answers[it.n], onSelect: l => { state.answers[it.n] = l; persist(); go(idx, true); } }));
     renderNav(); persist();
     backBtn.disabled = idx === 0;
     const last = idx + 1 === v.items.length;
