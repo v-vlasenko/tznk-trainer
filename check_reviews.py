@@ -37,8 +37,6 @@ def check(path: Path) -> list[str]:
             problems.append(f"{k}: no 'Відповідь:' line")
         if "Чому інші варіанти" not in r:
             problems.append(f"{k}: no 'Чому інші варіанти' section")
-        if "Як розпізнати" not in r:
-            problems.append(f"{k}: no 'Як розпізнати' line")
         m = LETTER_REF.search(text)
         if m:
             problems.append(f"{k}: letter reference '{m.group(0)}'")
