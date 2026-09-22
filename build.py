@@ -93,7 +93,23 @@ def merge(data: dict) -> list[str]:
         vid = v["id"]
         review_file = EXPL / f"{vid}.json"
         official_file = EXPL / f"official_{vid}.json"
-        reviews = json.loads(review_file.read_text(encoding="utf-8"))["items"] if review_file.exists() else {}
+        review_data = json.loads(review_file.read_text(encoding="utf-8")) if review_file.exists() else {}
+        reviews = review_data.get("items", {})
+        # Shared picture of a task series (logic block): explanations/<vid>.json "groups",
+        # keyed by the number of the first task; attached to every task of the group.
+        groups = review_data.get("groups", {})
+        by_group = {}
+        for it in v["items"]:
+            if it.get("group"):
+                by_group.setdefault(it["group"], []).append(it)
+        for members in by_group.values():
+            first = str(members[0]["n"])
+            for it in members:
+                if groups.get(first):
+                    it["setup"] = groups[first]
+                    it["setupRange"] = f"{members[0]['n']}–{members[-1]['n']}"
+                else:
+                    it.pop("setup", None); it.pop("setupRange", None)
         official = json.loads(official_file.read_text(encoding="utf-8"))["items"] if official_file.exists() else {}
         missing, flagged = [], []
         for it in v["items"]:

@@ -46,6 +46,16 @@ def check(path: Path) -> list[str]:
             problems.append(f"{k}: short review ({len(text)} chars)")
         if items[k].get("flag"):
             problems.append(f"{k}: FLAG {items[k]['flag'][:160]}")
+    for k, g in (data.get("groups") or {}).items():
+        text = re.sub(r"<[^>]+>", " ", g)
+        bad = set(re.findall(r"</?([a-zA-Z][a-zA-Z0-9]*)", g)) - ALLOWED
+        if bad:
+            problems.append(f"group {k}: disallowed tags {sorted(bad)}")
+        m = LETTER_REF.search(text)
+        if m:
+            problems.append(f"group {k}: letter reference '{m.group(0)}'")
+        if len(text) < 300:
+            problems.append(f"group {k}: short setup ({len(text)} chars)")
     if lengths:
         problems.append(f"lengths: min {min(lengths)}, median {sorted(lengths)[len(lengths)//2]}, max {max(lengths)}")
     return problems

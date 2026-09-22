@@ -155,6 +155,9 @@ table.hist td.kind { color: var(--muted); font-size: 12px; text-transform: upper
 .expl { margin-top: 14px; padding: 14px 16px; border-radius: 10px; background: var(--warn-soft); border: 1px solid transparent; font-size: 15px; }
 .expl p { margin: .5em 0; }
 .expl .t { font-weight: 700; margin-bottom: 4px; }
+.expl .setup { margin: 8px 0 12px; padding: 10px 12px; border-radius: 8px; background: var(--card); border: 1px solid var(--line); }
+.expl .setup summary { cursor: pointer; font-weight: 600; }
+.expl .setup > div { margin-top: 6px; }
 .expl .legend { margin: 8px 0; font-size: 13px; color: var(--muted); }
 .expl .legend ul { margin: 4px 0 0; padding-left: 18px; }
 .verdict { font-weight: 700; margin-top: 12px; }
@@ -470,6 +473,7 @@ function renderItem(item, variantId, opts) {
     if (item.review || sources.length) {
       const expl = el('div', { class: 'expl' + (item.review ? ' review' : '') + (opts.showExplanation ? '' : ' hidden') },
         el('div', { class: 't' }, item.review ? 'Розбір' : 'Пояснення'),
+        item.setup ? el('details', { class: 'setup', open: '' }, el('summary', {}, `Картина серії (завдання ${item.setupRange})`), el('div', { html: item.setup })) : null,
         item.review ? el('div', { html: item.review }) : null,
         ...sources);
       body.append(expl);
